@@ -13,8 +13,39 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
+    public DbSet<LedgerState> LedgerStates => Set<LedgerState>();
+
+    public DbSet<PeriodClose> PeriodCloses => Set<PeriodClose>();
+
+    public DbSet<PeriodBalance> PeriodBalances => Set<PeriodBalance>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<LedgerState>(state =>
+        {
+            state.HasKey(s => s.Id);
+            state.Property(s => s.Id).ValueGeneratedNever();
+            state.ToTable("LedgerState", table => table.HasCheckConstraint("CK_LedgerState_Singleton", "[Id] = 1"));
+            state.HasData(new LedgerState());
+        });
+
+        modelBuilder.Entity<PeriodClose>(close => close.HasKey(c => c.PeriodEnd));
+
+        modelBuilder.Entity<PeriodBalance>(balance =>
+        {
+            balance.HasKey(b => new { b.PeriodEnd, b.AccountId });
+            balance.Property(b => b.Debits).HasPrecision(28, JournalEntry.AmountScale);
+            balance.Property(b => b.Credits).HasPrecision(28, JournalEntry.AmountScale);
+            balance.HasOne<PeriodClose>()
+                .WithMany()
+                .HasForeignKey(b => b.PeriodEnd)
+                .OnDelete(DeleteBehavior.Restrict);
+            balance.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(b => b.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<Account>(account =>
         {
             account.HasKey(a => a.Id);

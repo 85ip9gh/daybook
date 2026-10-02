@@ -29,6 +29,7 @@ app.MapOpenApi();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapAccountEndpoints();
 app.MapJournalEndpoints();
+app.MapPeriodEndpoints();
 app.MapReportEndpoints();
 
 if (app.Configuration.GetValue<bool>("Ledger:MigrateOnStartup"))

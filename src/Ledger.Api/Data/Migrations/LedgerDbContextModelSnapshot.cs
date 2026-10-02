@@ -46,6 +46,64 @@ namespace Ledger.Api.Data.Migrations
                     b.ToTable("IdempotencyRecords");
                 });
 
+            modelBuilder.Entity("Ledger.Api.Data.LedgerState", b =>
+                {
+                    b.Property<byte>("Id")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateOnly?>("ClosedThrough")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LedgerState", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_LedgerState_Singleton", "[Id] = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = (byte)1
+                        });
+                });
+
+            modelBuilder.Entity("Ledger.Api.Data.PeriodBalance", b =>
+                {
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Credits")
+                        .HasPrecision(28, 4)
+                        .HasColumnType("decimal(28,4)");
+
+                    b.Property<decimal>("Debits")
+                        .HasPrecision(28, 4)
+                        .HasColumnType("decimal(28,4)");
+
+                    b.HasKey("PeriodEnd", "AccountId");
+
+                    b.HasIndex("AccountId");
+
+                    b.ToTable("PeriodBalances");
+                });
+
+            modelBuilder.Entity("Ledger.Api.Data.PeriodClose", b =>
+                {
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("ClosedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("PeriodEnd");
+
+                    b.ToTable("PeriodCloses");
+                });
+
             modelBuilder.Entity("Ledger.Domain.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -154,6 +212,21 @@ namespace Ledger.Api.Data.Migrations
                     b.HasOne("Ledger.Domain.JournalEntry", null)
                         .WithOne()
                         .HasForeignKey("Ledger.Api.Data.IdempotencyRecord", "JournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Ledger.Api.Data.PeriodBalance", b =>
+                {
+                    b.HasOne("Ledger.Domain.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Ledger.Api.Data.PeriodClose", null)
+                        .WithMany()
+                        .HasForeignKey("PeriodEnd")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

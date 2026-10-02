@@ -12,7 +12,7 @@ public class JournalEntryTests
     private Dictionary<Guid, Account> Accounts => new[] { _cash, _revenue, _tax }.ToDictionary(account => account.Id);
 
     private JournalEntry Post(params LineDraft[] lines) =>
-        JournalEntry.Post(EntryDate, "Invoice 1001", "CAD", lines, Accounts, RecordedAt);
+        JournalEntry.Post(EntryDate, "Invoice 1001", "CAD", lines, Accounts, null, RecordedAt);
 
     private static string CodeOf(Action act) => Assert.Throws<LedgerRuleException>(act).Code;
 
@@ -122,6 +122,7 @@ public class JournalEntryTests
             "USD",
             [new LineDraft(_cash.Id, EntrySide.Debit, 10m), new LineDraft(_revenue.Id, EntrySide.Credit, 10m)],
             Accounts,
+            null,
             RecordedAt));
 
         Assert.Equal("currency_mismatch", code);
@@ -138,6 +139,7 @@ public class JournalEntryTests
             "CAD",
             [new LineDraft(_cash.Id, EntrySide.Debit, 10m), new LineDraft(_revenue.Id, EntrySide.Credit, 10m)],
             Accounts,
+            null,
             RecordedAt));
 
         Assert.Equal("entry_description_invalid", code);
@@ -152,6 +154,7 @@ public class JournalEntryTests
             "CAD",
             [new LineDraft(_cash.Id, EntrySide.Debit, 10m), new LineDraft(_revenue.Id, EntrySide.Credit, 10m)],
             Accounts,
+            null,
             RecordedAt));
 
         Assert.Equal("entry_date_required", code);
@@ -165,7 +168,7 @@ public class JournalEntryTests
             new LineDraft(_revenue.Id, EntrySide.Credit, 100m),
             new LineDraft(_tax.Id, EntrySide.Credit, 15m));
 
-        var reversal = original.Reverse(EntryDate.AddDays(1), RecordedAt.AddDays(1));
+        var reversal = original.Reverse(EntryDate.AddDays(1), null, RecordedAt.AddDays(1));
 
         Assert.Equal(original.Id, reversal.ReversesEntryId);
         Assert.NotEqual(original.Id, reversal.Id);
@@ -180,9 +183,9 @@ public class JournalEntryTests
     {
         var reversal = Post(
             new LineDraft(_cash.Id, EntrySide.Debit, 10m),
-            new LineDraft(_revenue.Id, EntrySide.Credit, 10m)).Reverse(EntryDate, RecordedAt);
+            new LineDraft(_revenue.Id, EntrySide.Credit, 10m)).Reverse(EntryDate, null, RecordedAt);
 
-        var code = CodeOf(() => reversal.Reverse(EntryDate, RecordedAt));
+        var code = CodeOf(() => reversal.Reverse(EntryDate, null, RecordedAt));
 
         Assert.Equal("reversal_not_reversible", code);
     }
@@ -194,7 +197,7 @@ public class JournalEntryTests
             new LineDraft(_cash.Id, EntrySide.Debit, 10m),
             new LineDraft(_revenue.Id, EntrySide.Credit, 10m));
 
-        var code = CodeOf(() => original.Reverse(EntryDate.AddDays(-1), RecordedAt));
+        var code = CodeOf(() => original.Reverse(EntryDate.AddDays(-1), null, RecordedAt));
 
         Assert.Equal("reversal_before_original", code);
     }
@@ -208,9 +211,10 @@ public class JournalEntryTests
             "CAD",
             [new LineDraft(_cash.Id, EntrySide.Debit, 10m), new LineDraft(_revenue.Id, EntrySide.Credit, 10m)],
             Accounts,
+            null,
             RecordedAt);
 
-        var reversal = original.Reverse(EntryDate, RecordedAt);
+        var reversal = original.Reverse(EntryDate, null, RecordedAt);
 
         Assert.Equal(JournalEntry.MaxDescriptionLength, reversal.Description.Length);
     }

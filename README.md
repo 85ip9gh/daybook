@@ -12,15 +12,17 @@ The interesting part is not the endpoints. It is that the rules of bookkeeping h
 - **That holds under concurrency.** The key is a primary key and it is written in the same transaction as the entry. Concurrent requests with one key race on the constraint, one commits, and the rest read the winner back.
 - **An entry is reversed at most once.** A filtered unique index on `ReversesEntryId` decides concurrent reversals, not a check in application code.
 - **Money is `decimal(19,4)`.** Amounts are positive, carry at most four decimal places, and are never floating point. The database repeats the positive-amount rule as a check constraint.
-- **Balances are derived.** No balance column is stored, so there is nothing to drift out of step with the journal. A balance is a `SUM` over lines up to a date.
+- **Live balances are derived.** No running balance is stored, so there is nothing to drift out of step with the journal. A balance is a `SUM` over lines up to a date.
+- **A closed period stays closed.** Closing a month refuses every later post or reversal dated on or before its last day, and records each account's totals as of that day. The books only close forward.
+- **A close and a post cannot interleave.** Every post reads the closed-through date with `HOLDLOCK` inside its transaction, which holds a shared lock until commit. The close updates that row, so it waits for every post already in flight, and every post that starts later sees the new date. The snapshot therefore contains exactly the entries dated in the period. The hint is explicit so the lock is taken even where read committed snapshot isolation is on, as it is by default on Azure SQL.
 
 ## Layout
 
 ```
 src/Ledger.Domain   entities and rules, no dependencies
 src/Ledger.Api      endpoints, EF Core mapping, migrations
-tests/Ledger.Domain.Tests   38 tests, no database, no container
-tests/Ledger.Api.Tests      17 tests against SQL Server 2022 in a container
+tests/Ledger.Domain.Tests   53 tests, no database, no container
+tests/Ledger.Api.Tests      26 tests against SQL Server 2022 in a container
 ```
 
 The domain project references nothing outside the base class library. Every bookkeeping rule lives there and is tested without a database.
@@ -37,6 +39,9 @@ The domain project references nothing outside the base class library. Every book
 | GET | `/journal-entries/{id}` | Read an entry |
 | POST | `/journal-entries/{id}/reversal` | Reverse an entry |
 | GET | `/trial-balance?asOf=` | Trial balance |
+| GET | `/periods` | Closed-through date and recorded closes |
+| POST | `/periods/{year}/{month}/close` | Close the books through that month |
+| GET | `/periods/{year}/{month}/trial-balance` | Trial balance frozen at that close |
 | GET | `/openapi/v1.json` | OpenAPI document |
 
 Rule violations return RFC 9457 problem details with a stable `code` field such as `entry_unbalanced` or `currency_mismatch`.
@@ -68,6 +73,7 @@ ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Pass
 ## How the claims were checked
 
 - The two concurrency tests send 24 simultaneous posts with one key and 16 simultaneous reversals of one entry. With the unique-violation handling disabled, both fail. With it in place, exactly one request creates and the rest replay or conflict.
+- The period race test runs six rounds of 40 posts dated on a month's last day while that month is being closed. It asserts every post was either created or refused with `period_closed`, and that the stored snapshot equals the journal. With the `HOLDLOCK` hint removed it failed five runs out of five, with entries in the closed period that the snapshot had missed.
 - One test bypasses the API and inserts a negative amount with raw SQL, to show the check constraint refuses it independently of the application.
 - One domain test posts 500 random entries with random reversals from three fixed seeds and asserts the trial balance still balances.
 - CI fails if the EF Core model has changes that no migration covers.
@@ -76,7 +82,8 @@ ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Pass
 
 - No authentication or authorisation. Anyone who can reach the API can post.
 - An entry has one currency and every account on it must hold that currency. There is no conversion.
-- No accounting periods, so nothing stops a post dated into a period that should be closed.
+- A close cannot be reopened, and there are no year-end closing entries moving revenue and expense into retained earnings.
+- Every post takes a shared lock on one row. Posts do not block each other, but a close waits for all of them and they wait for it.
 - Append-only is enforced by the API surface, not by database permissions or triggers.
 - A refused request does not consume its idempotency key, so only successful posts are replayed.
 - Not deployed anywhere. The evidence is this repository and its test run.

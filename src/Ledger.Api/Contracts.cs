@@ -27,6 +27,10 @@ public sealed record EntryResponse(
 
 public sealed record TrialBalanceResponse(DateOnly AsOf, IReadOnlyList<TrialBalanceRow> Rows, decimal TotalDebit, decimal TotalCredit);
 
+public sealed record PeriodCloseResponse(DateOnly PeriodEnd, DateTimeOffset ClosedAt);
+
+public sealed record PeriodsResponse(DateOnly? ClosedThrough, IReadOnlyList<PeriodCloseResponse> Closes);
+
 internal static class ContractMappings
 {
     public static AccountResponse ToResponse(this Account account) =>
