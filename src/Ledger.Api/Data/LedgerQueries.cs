@@ -78,6 +78,20 @@ internal static class LedgerQueries
             """,
             cancellationToken);
 
+    public static async Task<int> NextNumberAsync(this LedgerDbContext db, string sequence, CancellationToken cancellationToken)
+    {
+        if (db.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException("A number is only gapless when it is taken inside the transaction that uses it.");
+        }
+
+        var values = await db.Database
+            .SqlQuery<int>($"UPDATE Sequences SET LastValue = LastValue + 1 OUTPUT inserted.LastValue AS Value WHERE Name = {sequence}")
+            .ToListAsync(cancellationToken);
+
+        return values.Single();
+    }
+
     public static bool IsUniqueViolation(this DbUpdateException exception) =>
         exception.InnerException is SqlException { Number: DuplicateIndexRow or DuplicateConstraintRow };
 }

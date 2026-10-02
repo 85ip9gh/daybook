@@ -92,6 +92,13 @@ public sealed class LedgerApiFixture : IAsyncLifetime
         return balance!;
     }
 
+    public async Task<T> ReadAsync<T>(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.True(response.IsSuccessStatusCode, $"{(int)response.StatusCode}: {body}");
+        return JsonSerializer.Deserialize<T>(body, Json)!;
+    }
+
     public static async Task<string?> ProblemCodeAsync(HttpResponseMessage response)
     {
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
