@@ -34,12 +34,15 @@ public sealed class JournalEntry
         string? currency,
         IReadOnlyList<LineDraft> lines,
         IReadOnlyDictionary<Guid, Account> accounts,
+        DateOnly? closedThrough,
         DateTimeOffset recordedAt)
     {
         if (entryDate == default)
         {
             throw new LedgerRuleException("entry_date_required", "Entry date is required.");
         }
+
+        AccountingPeriod.EnsureOpen(entryDate, closedThrough);
 
         var trimmedDescription = description?.Trim() ?? string.Empty;
         if (trimmedDescription.Length is 0 or > MaxDescriptionLength)
@@ -126,7 +129,7 @@ public sealed class JournalEntry
         return entry;
     }
 
-    public JournalEntry Reverse(DateOnly entryDate, DateTimeOffset recordedAt)
+    public JournalEntry Reverse(DateOnly entryDate, DateOnly? closedThrough, DateTimeOffset recordedAt)
     {
         if (ReversesEntryId is not null)
         {
@@ -137,6 +140,8 @@ public sealed class JournalEntry
         {
             throw new LedgerRuleException("reversal_before_original", "A reversal cannot be dated before the entry it reverses.");
         }
+
+        AccountingPeriod.EnsureOpen(entryDate, closedThrough);
 
         var description = ReversalPrefix + Description;
         var reversal = new JournalEntry

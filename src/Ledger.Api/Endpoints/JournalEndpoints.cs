@@ -43,6 +43,9 @@ internal static class JournalEndpoints
             return replay;
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var closedThrough = await db.HoldPeriodsOpenAsync(cancellationToken);
+
         var accountIds = request.Lines.Select(line => line.AccountId).Distinct().ToList();
         var accounts = await db.Accounts
             .Where(account => accountIds.Contains(account.Id))
@@ -54,6 +57,7 @@ internal static class JournalEndpoints
             request.Currency,
             [.. request.Lines.Select(line => new LineDraft(line.AccountId, line.Side, line.Amount))],
             accounts,
+            closedThrough,
             clock.GetUtcNow());
 
         db.JournalEntries.Add(entry);
@@ -62,9 +66,11 @@ internal static class JournalEndpoints
         try
         {
             await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (exception.IsUniqueViolation())
         {
+            await transaction.RollbackAsync(cancellationToken);
             db.ChangeTracker.Clear();
             var winner = await ReplayAsync(db, key, hash, http, cancellationToken);
             if (winner is null)
@@ -139,12 +145,16 @@ internal static class JournalEndpoints
             return AlreadyReversed(id);
         }
 
-        var reversal = original.Reverse(request.EntryDate, clock.GetUtcNow());
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var closedThrough = await db.HoldPeriodsOpenAsync(cancellationToken);
+
+        var reversal = original.Reverse(request.EntryDate, closedThrough, clock.GetUtcNow());
         db.JournalEntries.Add(reversal);
 
         try
         {
             await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (exception.IsUniqueViolation())
         {

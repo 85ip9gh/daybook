@@ -21,8 +21,18 @@ public sealed class LedgerApiFixture : IAsyncLifetime
     private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     private WebApplicationFactory<Program>? _factory;
     private int _accountSequence;
+    private int _periodSequence;
 
     public HttpClient Client { get; private set; } = null!;
+
+    public Period NextPeriod()
+    {
+        var index = Interlocked.Increment(ref _periodSequence) - 1;
+        return new Period(2001 + index / 12, index % 12 + 1);
+    }
+
+    public Task<HttpResponseMessage> ClosePeriodAsync(Period period) =>
+        Client.PostAsync($"/periods/{period.Year}/{period.Month}/close", null);
 
     public async Task InitializeAsync()
     {
@@ -87,6 +97,11 @@ public sealed class LedgerApiFixture : IAsyncLifetime
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return document.RootElement.TryGetProperty("code", out var code) ? code.GetString() : null;
     }
+}
+
+public readonly record struct Period(int Year, int Month)
+{
+    public DateOnly End => new(Year, Month, DateTime.DaysInMonth(Year, Month));
 }
 
 [CollectionDefinition(Name)]
