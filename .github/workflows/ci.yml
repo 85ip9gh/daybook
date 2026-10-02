@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore
+      - run: dotnet tool restore
+      - run: dotnet format --verify-no-changes --no-restore
+      - run: dotnet build --no-restore --configuration Release
+      - run: dotnet ef migrations has-pending-model-changes --project src/Ledger.Api --configuration Release --no-build
+      - run: dotnet test --no-build --configuration Release
