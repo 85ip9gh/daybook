@@ -64,7 +64,9 @@ src/Ledger.Api      endpoints, EF Core mapping, migrations
 tests/Ledger.Domain.Tests   113 tests, no database, no container
 tests/Ledger.Api.Tests      107 tests against SQL Server 2022 in a container
 tools/Ledger.Bench  seeds a large journal and measures the balance queries
+tools/seed-demo.mjs fills an empty database with a small set of books and demo users
 docs/tuning.md      what was measured, on what, and what it does not show
+web/                Angular front end, 38 tests, described in web/README.md
 ```
 
 The domain project references nothing outside the base class library. Every bookkeeping rule lives there and is tested without a database.
@@ -139,6 +141,14 @@ ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Pass
 ```
 
 `Jwt__SigningKey` must be at least 32 bytes. The first admin is created only when the users table is empty. No secret has a default and none is committed.
+
+For day-to-day development the same three secrets can live in .NET user secrets, which sit outside the repository and are read automatically in the Development environment:
+
+```bash
+dotnet user-secrets set "Jwt:SigningKey" "$LEDGER_JWT_KEY" --project src/Ledger.Api
+```
+
+The front end is in `web/` and its README covers running it against this API.
 
 ## How the claims were checked
 
