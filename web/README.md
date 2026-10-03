@@ -23,15 +23,25 @@ Body text is `#191917` on `#faf9f6`. Every control has a visible hover and focus
 | Accounts | readers, Controller to open | The chart of accounts |
 | Account statement | readers | Lines for a date range with a running balance |
 | New journal entry | Approver | Lines with live totals, postable only when balanced |
+| Customers | readers, Clerk to register | The customer list |
+| Customer | readers, Clerk to receive | Open invoices, and a payment allocated across them |
+| Invoices | readers | Every invoice, filtered by status |
+| New invoice | Clerk | Lines, optional tax, live totals, saved as a draft |
+| Invoice | readers, Approver to issue or void | Lines, totals, who drafted and issued it |
 | Aged receivables | readers | What each customer owed on a date, by how overdue |
+| Bank reconciliation | readers, Clerk to import, Approver to match | Both unreconciled sides, statement import, manual match |
 | Periods | readers, Controller to close | The closed-through date, and a two-step close |
+| Users | Admin | Add a user, change roles, deactivate |
 
 Navigation shows only what a role can open, and routes are guarded. That is convenience: the API enforces every rule itself.
 
 ## Details worth knowing
 
 - **Money is summed in whole cents.** Amounts typed into the journal form are parsed from text into integers before they are added, so `0.10 + 0.20` balances against `0.30`.
-- **A retry is safe.** The journal form keeps one idempotency key until a post succeeds. A failed post retried sends the same key, and the API answers with the original entry instead of posting twice.
+- **A retry is safe.** The journal and payment forms each keep one idempotency key until a post succeeds. A failed post retried sends the same key, and the API answers with the original instead of posting twice.
+- **Invoice totals are previewed with the server's arithmetic.** Quantity times price is multiplied as integers and rounded half away from zero, and tax is rounded once on the subtotal, so the preview equals what the API stores. The API stays the authority.
+- **A statement import is followed, not awaited.** The upload is answered at once, and the screen asks for the statement's status every second until the worker has finished.
+- **An administrator cannot deactivate their own account from the screen.**
 - **The token lives in `sessionStorage`.** It survives a reload and is gone when the tab closes. Any script running on the page could read it, which is the usual trade against an `HttpOnly` cookie.
 - **A `401` signs the user out** and returns to the sign-in page. A `403` is shown in place.
 - **The API address is read at start-up** from `public/config.json`, so one build can be pointed at any API without rebuilding.
@@ -72,8 +82,8 @@ npm run build
 npm run format:check
 ```
 
-38 unit tests cover money parsing and formatting, the journal entry rules, the token interceptor, role-based navigation, and the journal form itself: disabled until balanced, posting the right lines, keeping its key across a failed post.
+69 unit tests cover money parsing and formatting, the journal entry, invoice and payment rules, the token interceptor, role-based navigation, and the forms themselves: disabled until valid, sending the right lines, keeping a key across a failed post, and offering a match only when two amounts are equal.
 
 ## Not built yet
 
-Invoices, payments and bank reconciliation have no screens. User management has none either, so an administrator sees a page saying so. There is no dark theme.
+There is no dark theme. A match cannot be undone from the screen, although the API can. Journal entries can be posted but not browsed or reversed. Nothing warns before deactivating the last administrator.

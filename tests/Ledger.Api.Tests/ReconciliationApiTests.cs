@@ -269,6 +269,19 @@ public class ReconciliationApiTests(LedgerApiFixture api)
     }
 
     [Fact]
+    public async Task Statements_for_an_account_are_listed_newest_first()
+    {
+        var (bank, _) = await AccountsAsync();
+        var first = await ImportAsync(bank.Id, Header + Line(Day, Reference(), 10m));
+        var second = await ImportAsync(bank.Id, Header + "broken");
+
+        var listed = await api.Client.GetFromJsonAsync<List<StatementResponse>>($"/bank-accounts/{bank.Id}/statements", LedgerApiFixture.Json);
+
+        Assert.Equal([second.Id, first.Id], listed!.Select(statement => statement.Id));
+        Assert.Equal([StatementStatus.Failed, StatementStatus.Processed], listed!.Select(statement => statement.Status));
+    }
+
+    [Fact]
     public async Task A_statement_is_refused_for_an_account_that_is_not_a_bank_account_and_from_a_viewer()
     {
         var (bank, revenue) = await AccountsAsync();

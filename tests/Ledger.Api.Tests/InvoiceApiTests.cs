@@ -154,6 +154,23 @@ public class InvoiceApiTests(LedgerApiFixture api)
     }
 
     [Fact]
+    public async Task Invoices_are_listed_by_customer_and_status_with_drafts_first()
+    {
+        var scenario = await ReceivablesScenario.CreateAsync(api);
+        var older = await scenario.IssuedAsync(10m);
+        var newer = await scenario.IssuedAsync(20m);
+        var draft = await scenario.DraftAsync(30m);
+        var other = await ReceivablesScenario.CreateAsync(api);
+        await other.IssuedAsync(99m);
+
+        var all = await api.Client.GetFromJsonAsync<List<InvoiceResponse>>($"/invoices?customerId={scenario.Customer.Id}", LedgerApiFixture.Json);
+        var issued = await api.Client.GetFromJsonAsync<List<InvoiceResponse>>($"/invoices?customerId={scenario.Customer.Id}&status=Issued", LedgerApiFixture.Json);
+
+        Assert.Equal([draft.Id, newer.Id, older.Id], all!.Select(invoice => invoice.Id));
+        Assert.Equal([newer.Id, older.Id], issued!.Select(invoice => invoice.Id));
+    }
+
+    [Fact]
     public async Task A_customer_code_is_unique()
     {
         var existing = await ReceivablesScenario.RegisterCustomerAsync(api);

@@ -1,6 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import type { Role } from './auth';
 import { AppConfig } from './config';
 
 export type AccountType = 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense';
@@ -103,6 +104,121 @@ export interface Periods {
   closes: PeriodClose[];
 }
 
+export interface Customer {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export type InvoiceStatus = 'Draft' | 'Issued' | 'Paid' | 'Void';
+
+export interface InvoiceLine {
+  lineNumber: number;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  revenueAccountId: string;
+  amount: number;
+}
+
+export interface Invoice {
+  id: string;
+  customerId: string;
+  status: InvoiceStatus;
+  number: number | null;
+  currency: string;
+  issueDate: string | null;
+  dueDate: string | null;
+  subtotal: number;
+  tax: number;
+  total: number;
+  amountPaid: number;
+  outstanding: number;
+  journalEntryId: string | null;
+  lines: InvoiceLine[];
+  draftedBy: string;
+  issuedBy: string | null;
+  voidedBy: string | null;
+}
+
+export interface NewInvoice {
+  customerId: string;
+  currency: string;
+  receivableAccountId: string;
+  lines: { description: string; quantity: number; unitPrice: number; revenueAccountId: string }[];
+  tax: { rate: number; accountId: string } | null;
+}
+
+export interface Receivables {
+  customerId: string;
+  outstanding: number;
+  invoices: Invoice[];
+}
+
+export interface NewPayment {
+  customerId: string;
+  paymentDate: string;
+  amount: number;
+  currency: string;
+  depositAccountId: string;
+  allocations: { invoiceId: string; amount: number }[];
+}
+
+export interface Payment {
+  id: string;
+  paymentDate: string;
+  amount: number;
+  receivedBy: string;
+  allocations: { invoiceId: string; amount: number }[];
+}
+
+export type StatementStatus = 'Pending' | 'Processing' | 'Processed' | 'Failed';
+
+export interface BankStatement {
+  id: string;
+  accountId: string;
+  status: StatementStatus;
+  lineCount: number;
+  newLineCount: number;
+  matchedCount: number;
+  error: string | null;
+  importedBy: string;
+  importedAt: string;
+}
+
+export interface BankLine {
+  id: string;
+  date: string;
+  reference: string;
+  description: string;
+  amount: number;
+}
+
+export interface LedgerLine {
+  journalEntryId: string;
+  lineNumber: number;
+  entryDate: string;
+  amount: number;
+}
+
+export interface Reconciliation {
+  accountId: string;
+  asOf: string;
+  bookBalance: number;
+  bankTotal: number;
+  unmatchedBankLines: BankLine[];
+  unmatchedBankTotal: number;
+  unreconciledLedgerLines: LedgerLine[];
+  unreconciledLedgerTotal: number;
+}
+
+export interface User {
+  id: string;
+  userName: string;
+  roles: Role[];
+  isActive: boolean;
+}
+
 export interface Problem {
   status: number;
   code: string;
@@ -174,5 +290,86 @@ export class Api {
 
   closePeriod(year: number, month: number): Observable<PeriodClose> {
     return this.http.post<PeriodClose>(this.url(`/periods/${year}/${month}/close`), null);
+  }
+
+  customers(): Observable<Customer[]> {
+    return this.http.get<Customer[]>(this.url('/customers'));
+  }
+
+  registerCustomer(customer: Pick<Customer, 'code' | 'name'>): Observable<Customer> {
+    return this.http.post<Customer>(this.url('/customers'), customer);
+  }
+
+  receivables(customerId: string): Observable<Receivables> {
+    return this.http.get<Receivables>(this.url(`/customers/${customerId}/receivables`));
+  }
+
+  invoices(status: InvoiceStatus | ''): Observable<Invoice[]> {
+    return this.http.get<Invoice[]>(this.url('/invoices'), { params: status ? { status } : {} });
+  }
+
+  invoice(id: string): Observable<Invoice> {
+    return this.http.get<Invoice>(this.url(`/invoices/${id}`));
+  }
+
+  draftInvoice(invoice: NewInvoice): Observable<Invoice> {
+    return this.http.post<Invoice>(this.url('/invoices'), invoice);
+  }
+
+  issueInvoice(id: string, issueDate: string, dueDate: string): Observable<Invoice> {
+    return this.http.post<Invoice>(this.url(`/invoices/${id}/issue`), { issueDate, dueDate });
+  }
+
+  voidInvoice(id: string, voidDate: string): Observable<Invoice> {
+    return this.http.post<Invoice>(this.url(`/invoices/${id}/void`), { voidDate });
+  }
+
+  receivePayment(payment: NewPayment, idempotencyKey: string): Observable<Payment> {
+    return this.http.post<Payment>(this.url('/payments'), payment, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
+
+  reconciliation(accountId: string, asOf: string): Observable<Reconciliation> {
+    return this.http.get<Reconciliation>(this.url(`/bank-accounts/${accountId}/reconciliation`), {
+      params: { asOf },
+    });
+  }
+
+  statements(accountId: string): Observable<BankStatement[]> {
+    return this.http.get<BankStatement[]>(this.url(`/bank-accounts/${accountId}/statements`));
+  }
+
+  bankStatement(id: string): Observable<BankStatement> {
+    return this.http.get<BankStatement>(this.url(`/bank-statements/${id}`));
+  }
+
+  uploadStatement(accountId: string, csv: string): Observable<BankStatement> {
+    return this.http.post<BankStatement>(this.url(`/bank-accounts/${accountId}/statements`), csv, {
+      headers: { 'Content-Type': 'text/csv' },
+    });
+  }
+
+  matchBankLine(bankLineId: string, journalEntryId: string, lineNumber: number): Observable<void> {
+    return this.http.post<void>(this.url(`/bank-lines/${bankLineId}/match`), {
+      journalEntryId,
+      lineNumber,
+    });
+  }
+
+  users(): Observable<User[]> {
+    return this.http.get<User[]>(this.url('/users'));
+  }
+
+  createUser(userName: string, password: string, roles: Role[]): Observable<User> {
+    return this.http.post<User>(this.url('/users'), { userName, password, roles });
+  }
+
+  assignRoles(id: string, roles: Role[]): Observable<User> {
+    return this.http.put<User>(this.url(`/users/${id}/roles`), { roles });
+  }
+
+  deactivateUser(id: string): Observable<User> {
+    return this.http.post<User>(this.url(`/users/${id}/deactivate`), null);
   }
 }
