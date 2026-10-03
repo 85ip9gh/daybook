@@ -1,4 +1,4 @@
-name: ledger
+name: daybook
 
 services:
   db:
@@ -23,7 +23,7 @@ services:
     build:
       context: ..
       dockerfile: src/Ledger.Api/Dockerfile
-    image: ledger-api:local
+    image: daybook-api:local
     environment:
       ConnectionStrings__Ledger: Server=db;Database=Ledger;User Id=sa;Password=${MSSQL_SA_PASSWORD:?};TrustServerCertificate=True
       Jwt__SigningKey: ${LEDGER_JWT_KEY:?}
@@ -43,7 +43,7 @@ services:
   web:
     build:
       context: ../web
-    image: ledger-web:local
+    image: daybook-web:local
     ports:
       - ${LEDGER_BIND:?}:8080
     depends_on:

@@ -10,7 +10,7 @@ import { Auth } from '../core/auth';
   template: `
     <div class="frame">
       <aside class="band">
-        <span class="brand">Ledger</span>
+        <span class="brand">Daybook</span>
         <p>Double-entry books, receivables and bank reconciliation.</p>
       </aside>
 

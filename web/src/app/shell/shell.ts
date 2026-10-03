@@ -49,7 +49,7 @@ const navigation: NavGroup[] = [
   template: `
     <div class="shell">
       <aside class="rail">
-        <a class="brand" routerLink="/">Ledger</a>
+        <a class="brand" routerLink="/">Daybook</a>
 
         <nav aria-label="Primary">
           @for (group of groups(); track group.title) {

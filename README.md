@@ -1,6 +1,6 @@
-# Ledger
+# Daybook
 
-A double-entry general ledger with accounts receivable on top of it, exposed as an HTTP API. C# on .NET 10, ASP.NET Core minimal APIs, EF Core, SQL Server.
+Daybook is a double-entry general ledger with accounts receivable on top of it, exposed as an HTTP API. C# on .NET 10, ASP.NET Core minimal APIs, EF Core, SQL Server.
 
 The interesting part is not the endpoints. It is that the rules of bookkeeping hold when requests are retried, raced, or malformed, and that each of those claims has a test that fails when the code protecting it is removed.
 
