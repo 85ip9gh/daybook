@@ -77,12 +77,12 @@ public class TrialBalanceTests
                 .Concat(credits.Select(amount => new LineDraft(accounts[random.Next(accounts.Count)].Id, EntrySide.Credit, amount)))
                 .ToList();
 
-            var entry = JournalEntry.Post(EntryDate, $"Entry {index}", "CAD", lines, byId, null, DateTimeOffset.UnixEpoch);
+            var entry = JournalEntry.Post(EntryDate, $"Entry {index}", "CAD", lines, byId, null, "poster", DateTimeOffset.UnixEpoch);
             entries.Add(entry);
 
             if (random.Next(5) == 0)
             {
-                entries.Add(entry.Reverse(EntryDate, null, DateTimeOffset.UnixEpoch));
+                entries.Add(entry.Reverse(EntryDate, null, "poster", DateTimeOffset.UnixEpoch));
             }
         }
 

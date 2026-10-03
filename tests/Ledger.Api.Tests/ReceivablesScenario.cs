@@ -46,7 +46,7 @@ internal sealed class ReceivablesScenario
     }
 
     public Task<HttpResponseMessage> DraftRawAsync(DraftInvoiceRequest request) =>
-        _api.Client.PostAsJsonAsync("/invoices", request, LedgerApiFixture.Json);
+        _api.Clerk.PostAsJsonAsync("/invoices", request, LedgerApiFixture.Json);
 
     public async Task<InvoiceResponse> DraftAsync(decimal unitPrice, decimal quantity = 1m, decimal? taxRate = null)
     {
@@ -63,7 +63,7 @@ internal sealed class ReceivablesScenario
     public Task<HttpResponseMessage> IssueRawAsync(Guid invoiceId, DateOnly? issueDate = null, DateOnly? dueDate = null)
     {
         var issued = issueDate ?? Today;
-        return _api.Client.PostAsJsonAsync($"/invoices/{invoiceId}/issue", new IssueInvoiceRequest(issued, dueDate ?? issued.AddDays(30)), LedgerApiFixture.Json);
+        return _api.Approver.PostAsJsonAsync($"/invoices/{invoiceId}/issue", new IssueInvoiceRequest(issued, dueDate ?? issued.AddDays(30)), LedgerApiFixture.Json);
     }
 
     public async Task<InvoiceResponse> IssuedAsync(decimal amount)
@@ -73,7 +73,7 @@ internal sealed class ReceivablesScenario
     }
 
     public Task<HttpResponseMessage> VoidRawAsync(Guid invoiceId, DateOnly? voidDate = null) =>
-        _api.Client.PostAsJsonAsync($"/invoices/{invoiceId}/void", new VoidInvoiceRequest(voidDate ?? Today), LedgerApiFixture.Json);
+        _api.Approver.PostAsJsonAsync($"/invoices/{invoiceId}/void", new VoidInvoiceRequest(voidDate ?? Today), LedgerApiFixture.Json);
 
     public Task<HttpResponseMessage> PayRawAsync(string? key, decimal amount, params (Guid InvoiceId, decimal Amount)[] allocations) =>
         PayRawAsync(key, Customer.Id, amount, allocations);
@@ -94,7 +94,7 @@ internal sealed class ReceivablesScenario
             message.Headers.Add("Idempotency-Key", key);
         }
 
-        return _api.Client.SendAsync(message);
+        return _api.Clerk.SendAsync(message);
     }
 
     public async Task<InvoiceResponse> InvoiceAsync(Guid invoiceId) =>

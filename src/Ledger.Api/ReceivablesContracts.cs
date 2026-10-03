@@ -37,7 +37,10 @@ public sealed record InvoiceResponse(
     decimal AmountPaid,
     decimal Outstanding,
     Guid? JournalEntryId,
-    IReadOnlyList<InvoiceLineResponse> Lines);
+    IReadOnlyList<InvoiceLineResponse> Lines,
+    string DraftedBy,
+    string? IssuedBy,
+    string? VoidedBy);
 
 public sealed record AllocationRequest(Guid InvoiceId, decimal Amount);
 
@@ -59,7 +62,8 @@ public sealed record PaymentResponse(
     string Currency,
     Guid DepositAccountId,
     Guid JournalEntryId,
-    IReadOnlyList<AllocationResponse> Allocations);
+    IReadOnlyList<AllocationResponse> Allocations,
+    string ReceivedBy);
 
 public sealed record ReceivablesResponse(Guid CustomerId, decimal Outstanding, IReadOnlyList<InvoiceResponse> Invoices);
 
@@ -84,7 +88,10 @@ internal static class ReceivablesMappings
             invoice.JournalEntryId,
             [.. invoice.Lines
                 .OrderBy(line => line.LineNumber)
-                .Select(line => new InvoiceLineResponse(line.LineNumber, line.Description, line.Quantity, line.UnitPrice, line.RevenueAccountId, line.Amount))]);
+                .Select(line => new InvoiceLineResponse(line.LineNumber, line.Description, line.Quantity, line.UnitPrice, line.RevenueAccountId, line.Amount))],
+            invoice.DraftedBy,
+            invoice.IssuedBy,
+            invoice.VoidedBy);
 
     public static PaymentResponse ToResponse(this Payment payment) =>
         new(
@@ -95,5 +102,6 @@ internal static class ReceivablesMappings
             payment.Currency,
             payment.DepositAccountId,
             payment.JournalEntryId,
-            [.. payment.Allocations.Select(allocation => new AllocationResponse(allocation.InvoiceId, allocation.Amount))]);
+            [.. payment.Allocations.Select(allocation => new AllocationResponse(allocation.InvoiceId, allocation.Amount))],
+            payment.ReceivedBy);
 }

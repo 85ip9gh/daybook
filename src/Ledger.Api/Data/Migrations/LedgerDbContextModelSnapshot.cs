@@ -22,6 +22,37 @@ namespace Ledger.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Ledger.Api.Auth.AppUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<int>("Roles")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserName")
+                        .IsUnique();
+
+                    b.ToTable("Users", (string)null);
+                });
+
             modelBuilder.Entity("Ledger.Api.Data.IdempotencyRecord", b =>
                 {
                     b.Property<string>("Key")
@@ -121,6 +152,11 @@ namespace Ledger.Api.Data.Migrations
                     b.Property<DateTimeOffset>("ClosedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("ClosedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.HasKey("PeriodEnd");
 
                     b.ToTable("PeriodCloses");
@@ -181,6 +217,11 @@ namespace Ledger.Api.Data.Migrations
 
                     b.Property<DateOnly>("EntryDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("PostedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("datetimeoffset");
@@ -271,11 +312,20 @@ namespace Ledger.Api.Data.Migrations
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("DraftedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateOnly?>("DueDate")
                         .HasColumnType("date");
 
                     b.Property<DateOnly?>("IssueDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("IssuedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<Guid?>("JournalEntryId")
                         .HasColumnType("uniqueidentifier");
@@ -312,6 +362,10 @@ namespace Ledger.Api.Data.Migrations
                     b.Property<decimal>("Total")
                         .HasPrecision(19, 4)
                         .HasColumnType("decimal(19,4)");
+
+                    b.Property<string>("VoidedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
 
@@ -397,6 +451,11 @@ namespace Ledger.Api.Data.Migrations
 
                     b.Property<DateOnly>("PaymentDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("ReceivedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
 

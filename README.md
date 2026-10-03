@@ -27,42 +27,59 @@ Nobody types debits and credits for a sale. An invoice or a payment is the busin
 - **What customers owe equals the ledger.** The sum of outstanding invoices equals the balance of the receivable control account, and a test checks it after invoices, a split payment and a void.
 - **Rounding is commercial.** Line amounts and tax round half away from zero to two places. `Math.Round` defaults to half-to-even, which is not what an invoice should do.
 
+### Who may do what
+
+- **Every route needs a token except three.** A fallback policy requires an authenticated user, so a route added without a policy is closed, not open. `GET /healthz`, the OpenAPI document and `POST /auth/token` are the only public ones, and a test walks every mapped route to prove it.
+- **Tokens are JWTs signed with HS256.** Issuer, audience, signature, algorithm and expiry are all validated, with 30 seconds of clock skew and a 30 minute lifetime. The API refuses to start with a signing key under 256 bits.
+- **Passwords are stored as PBKDF2 hashes** through ASP.NET Core's `PasswordHasher`. A wrong password and an unknown user get the same answer, and the unknown-user path still runs a hash so the two take similar time.
+- **Roles are narrow and separate.** Viewer reads. Clerk registers customers, drafts invoices and receives payments. Approver issues and voids invoices and posts and reverses journal entries. Controller opens accounts and closes periods. Admin manages users and cannot read the books.
+- **Holding two roles is not enough to approve your own work.** Whoever drafted an invoice cannot issue it. That rule lives in the domain, not in a route policy, and answers `403 segregation_of_duties`.
+- **Every record names its author.** Journal entries, invoices, payments and period closes store the user who made them, and the domain refuses to post an entry attributed to nobody.
+
 ## Layout
 
 ```
 src/Ledger.Domain   entities and rules, no dependencies
 src/Ledger.Api      endpoints, EF Core mapping, migrations
-tests/Ledger.Domain.Tests   71 tests, no database, no container
-tests/Ledger.Api.Tests      45 tests against SQL Server 2022 in a container
+tests/Ledger.Domain.Tests   80 tests, no database, no container
+tests/Ledger.Api.Tests      88 tests against SQL Server 2022 in a container
 ```
 
 The domain project references nothing outside the base class library. Every bookkeeping rule lives there and is tested without a database.
 
 ## Endpoints
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/accounts` | Open an account |
-| GET | `/accounts` | List accounts |
-| POST | `/accounts/{id}/deactivate` | Stop new postings to an account |
-| GET | `/accounts/{id}/balance?asOf=` | Balance on the account's normal side |
-| POST | `/journal-entries` | Post an entry, idempotent by key |
-| GET | `/journal-entries/{id}` | Read an entry |
-| POST | `/journal-entries/{id}/reversal` | Reverse an entry |
-| GET | `/trial-balance?asOf=` | Trial balance |
-| GET | `/periods` | Closed-through date and recorded closes |
-| POST | `/periods/{year}/{month}/close` | Close the books through that month |
-| GET | `/periods/{year}/{month}/trial-balance` | Trial balance frozen at that close |
-| POST | `/customers` | Register a customer |
-| GET | `/customers` | List customers |
-| GET | `/customers/{id}/receivables` | Open invoices and the total owed |
-| POST | `/invoices` | Draft an invoice |
-| GET | `/invoices/{id}` | Read an invoice |
-| POST | `/invoices/{id}/issue` | Number it and post it |
-| POST | `/invoices/{id}/void` | Void an unpaid invoice by reversing its entry |
-| POST | `/payments` | Receive a payment and allocate it, idempotent by key |
-| GET | `/payments/{id}` | Read a payment |
-| GET | `/openapi/v1.json` | OpenAPI document |
+Every `GET` below needs Viewer, Clerk, Approver or Controller unless the table says otherwise.
+
+| Method | Path | Role | Purpose |
+|---|---|---|---|
+| POST | `/auth/token` | public | Exchange a user name and password for a token |
+| POST | `/users` | Admin | Create a user |
+| GET | `/users` | Admin | List users |
+| PUT | `/users/{id}/roles` | Admin | Replace a user's roles |
+| POST | `/users/{id}/deactivate` | Admin | Stop a user signing in |
+| POST | `/accounts` | Controller | Open an account |
+| GET | `/accounts` | read | List accounts |
+| POST | `/accounts/{id}/deactivate` | Controller | Stop new postings to an account |
+| GET | `/accounts/{id}/balance?asOf=` | read | Balance on the account's normal side |
+| POST | `/journal-entries` | Approver | Post an entry, idempotent by key |
+| GET | `/journal-entries/{id}` | read | Read an entry |
+| POST | `/journal-entries/{id}/reversal` | Approver | Reverse an entry |
+| GET | `/trial-balance?asOf=` | read | Trial balance |
+| GET | `/periods` | read | Closed-through date and recorded closes |
+| POST | `/periods/{year}/{month}/close` | Controller | Close the books through that month |
+| GET | `/periods/{year}/{month}/trial-balance` | read | Trial balance frozen at that close |
+| POST | `/customers` | Clerk | Register a customer |
+| GET | `/customers` | read | List customers |
+| GET | `/customers/{id}/receivables` | read | Open invoices and the total owed |
+| POST | `/invoices` | Clerk | Draft an invoice |
+| GET | `/invoices/{id}` | read | Read an invoice |
+| POST | `/invoices/{id}/issue` | Approver | Number it and post it |
+| POST | `/invoices/{id}/void` | Approver | Void an unpaid invoice by reversing its entry |
+| POST | `/payments` | Clerk | Receive a payment and allocate it, idempotent by key |
+| GET | `/payments/{id}` | read | Read a payment |
+| GET | `/openapi/v1.json` | public | OpenAPI document |
+| GET | `/healthz` | public | Liveness |
 
 Rule violations return RFC 9457 problem details with a stable `code` field such as `entry_unbalanced` or `currency_mismatch`.
 
@@ -87,8 +104,10 @@ docker run -d --name ledger-sql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$MSSQL_SA
 ```
 
 ```bash
-ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Password=$MSSQL_SA_PASSWORD;TrustServerCertificate=True" Ledger__MigrateOnStartup=true dotnet run --project src/Ledger.Api
+ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Password=$MSSQL_SA_PASSWORD;TrustServerCertificate=True" Jwt__SigningKey="$LEDGER_JWT_KEY" Ledger__FirstAdmin__UserName=admin Ledger__FirstAdmin__Password="$LEDGER_ADMIN_PASSWORD" Ledger__MigrateOnStartup=true dotnet run --project src/Ledger.Api
 ```
+
+`Jwt__SigningKey` must be at least 32 bytes. The first admin is created only when the users table is empty. No secret has a default and none is committed.
 
 ## How the claims were checked
 
@@ -96,13 +115,19 @@ ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Pass
 - The period race test runs six rounds of 40 posts dated on a month's last day while that month is being closed. It asserts every post was either created or refused with `period_closed`, and that the stored snapshot equals the journal. With the `HOLDLOCK` hint removed it failed five runs out of five, with entries in the closed period that the snapshot had missed.
 - Twelve simultaneous payments of 30 are sent against one invoice of 100, and twelve simultaneous issues against one draft. With the concurrency token disabled, all twelve payments were accepted and the draft was issued twelve times, three runs out of three. With it in place, at most three payments land and the draft is issued once.
 - Twenty drafts issued at once must come back with twenty consecutive numbers, and an issue that fails after taking a number must leave the next invoice with the very next one.
+- One test enumerates every mapped route and calls it with no token. Anything other than the three public routes that does not answer `401` fails it. With the fallback policy removed and one route left without a policy, the test failed and named that route.
+- Tokens that are expired, for another audience, from another issuer, signed with another key, unsigned, or garbage are each refused, and a token built the same way with nothing wrong is accepted. With lifetime validation turned off only the expired case failed, and with audience validation turned off only the audience case failed.
+- A table of 22 role and route pairs checks that each role reaches its own routes and gets `403` on the others.
 - One test bypasses the API and inserts a negative amount with raw SQL, to show the check constraint refuses it independently of the application.
 - One domain test posts 500 random entries with random reversals from three fixed seeds and asserts the trial balance still balances.
 - CI fails if the EF Core model has changes that no migration covers.
 
 ## Limitations
 
-- No authentication or authorisation. Anyone who can reach the API can post.
+- The API is its own user store and token issuer with one symmetric key. There is no external identity provider, no refresh token, no key rotation, no lockout and no rate limit on `/auth/token`.
+- A token stays valid until it expires. Deactivating a user or changing their roles takes effect at their next sign-in, up to 30 minutes later.
+- Segregation of duties covers issuing an invoice only. Nothing stops an approver reversing their own journal entry.
+- Rows written before the audit columns existed carry an empty author.
 - An entry has one currency and every account on it must hold that currency. There is no conversion.
 - A payment must be allocated in full. There is no unapplied cash, no credit notes, no refunds, and no accounts payable side.
 - A payment that loses a concurrency race is refused, not retried by the server.

@@ -16,6 +16,7 @@ public class AccountingPeriodTests
             [new LineDraft(_cash.Id, EntrySide.Debit, 10m), new LineDraft(_revenue.Id, EntrySide.Credit, 10m)],
             new[] { _cash, _revenue }.ToDictionary(account => account.Id),
             closedThrough,
+            "poster",
             RecordedAt);
 
     [Theory]
@@ -79,7 +80,7 @@ public class AccountingPeriodTests
     {
         var original = Post(new DateOnly(2026, 9, 10), null);
 
-        var exception = Assert.Throws<LedgerRuleException>(() => original.Reverse(new DateOnly(2026, 9, 20), ClosedThrough, RecordedAt));
+        var exception = Assert.Throws<LedgerRuleException>(() => original.Reverse(new DateOnly(2026, 9, 20), ClosedThrough, "poster", RecordedAt));
 
         Assert.Equal("period_closed", exception.Code);
     }
@@ -89,7 +90,7 @@ public class AccountingPeriodTests
     {
         var original = Post(new DateOnly(2026, 9, 10), null);
 
-        var reversal = original.Reverse(new DateOnly(2026, 10, 1), ClosedThrough, RecordedAt);
+        var reversal = original.Reverse(new DateOnly(2026, 10, 1), ClosedThrough, "poster", RecordedAt);
 
         Assert.Equal(original.Id, reversal.ReversesEntryId);
     }

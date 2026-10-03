@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
 using Ledger.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -9,9 +11,9 @@ internal static class PeriodEndpoints
     public static IEndpointRouteBuilder MapPeriodEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/periods").WithTags("Periods");
-        group.MapGet("/", ListAsync);
-        group.MapPost("/{year:int}/{month:int}/close", CloseAsync);
-        group.MapGet("/{year:int}/{month:int}/trial-balance", ClosingTrialBalanceAsync);
+        group.MapGet("/", ListAsync).RequireAuthorization(Policies.Read);
+        group.MapPost("/{year:int}/{month:int}/close", CloseAsync).RequireAuthorization(Policies.Close);
+        group.MapGet("/{year:int}/{month:int}/trial-balance", ClosingTrialBalanceAsync).RequireAuthorization(Policies.Read);
         return routes;
     }
 
@@ -20,7 +22,7 @@ internal static class PeriodEndpoints
         var state = await db.LedgerStates.AsNoTracking().SingleAsync(cancellationToken);
         var closes = await db.PeriodCloses.AsNoTracking().OrderBy(close => close.PeriodEnd).ToListAsync(cancellationToken);
 
-        return Results.Ok(new PeriodsResponse(state.ClosedThrough, [.. closes.Select(close => new PeriodCloseResponse(close.PeriodEnd, close.ClosedAt))]));
+        return Results.Ok(new PeriodsResponse(state.ClosedThrough, [.. closes.Select(close => new PeriodCloseResponse(close.PeriodEnd, close.ClosedAt, close.ClosedBy))]));
     }
 
     private static async Task<IResult> CloseAsync(
@@ -28,6 +30,7 @@ internal static class PeriodEndpoints
         int month,
         LedgerDbContext db,
         TimeProvider clock,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
@@ -41,13 +44,13 @@ internal static class PeriodEndpoints
             return Problems.Conflict("period_already_closed", $"The books are already closed through {periodEnd:yyyy-MM-dd} or later.");
         }
 
-        var close = new PeriodClose { PeriodEnd = periodEnd, ClosedAt = now };
+        var close = new PeriodClose { PeriodEnd = periodEnd, ClosedAt = now, ClosedBy = user.Name() };
         db.PeriodCloses.Add(close);
         await db.SaveChangesAsync(cancellationToken);
         await db.SnapshotBalancesAsync(periodEnd, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return Results.Created($"/periods/{year}/{month}/trial-balance", new PeriodCloseResponse(close.PeriodEnd, close.ClosedAt));
+        return Results.Created($"/periods/{year}/{month}/trial-balance", new PeriodCloseResponse(close.PeriodEnd, close.ClosedAt, close.ClosedBy));
     }
 
     private static async Task<IResult> ClosingTrialBalanceAsync(int year, int month, LedgerDbContext db, CancellationToken cancellationToken)

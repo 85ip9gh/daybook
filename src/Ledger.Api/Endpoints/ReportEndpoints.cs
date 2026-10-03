@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
 using Ledger.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +10,7 @@ internal static class ReportEndpoints
 {
     public static IEndpointRouteBuilder MapReportEndpoints(this IEndpointRouteBuilder routes)
     {
-        routes.MapGet("/trial-balance", TrialBalanceAsync).WithTags("Reports");
+        routes.MapGet("/trial-balance", TrialBalanceAsync).WithTags("Reports").RequireAuthorization(Policies.Read);
         return routes;
     }
 

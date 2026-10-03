@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
 using Ledger.Domain;
 using Microsoft.AspNetCore.Mvc;
@@ -10,9 +12,9 @@ internal static class JournalEndpoints
     public static IEndpointRouteBuilder MapJournalEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/journal-entries").WithTags("Journal");
-        group.MapPost("/", PostAsync);
-        group.MapGet("/{id:guid}", GetAsync);
-        group.MapPost("/{id:guid}/reversal", ReverseAsync);
+        group.MapPost("/", PostAsync).RequireAuthorization(Policies.Post);
+        group.MapGet("/{id:guid}", GetAsync).RequireAuthorization(Policies.Read);
+        group.MapPost("/{id:guid}/reversal", ReverseAsync).RequireAuthorization(Policies.Post);
         return routes;
     }
 
@@ -21,6 +23,7 @@ internal static class JournalEndpoints
         [FromHeader(Name = Idempotency.KeyHeader)] string? idempotencyKey,
         LedgerDbContext db,
         TimeProvider clock,
+        ClaimsPrincipal user,
         HttpContext http,
         CancellationToken cancellationToken)
     {
@@ -53,6 +56,7 @@ internal static class JournalEndpoints
             [.. request.Lines.Select(line => new LineDraft(line.AccountId, line.Side, line.Amount))],
             accounts,
             closedThrough,
+            user.Name(),
             clock.GetUtcNow());
 
         db.JournalEntries.Add(entry);
@@ -123,6 +127,7 @@ internal static class JournalEndpoints
         ReverseEntryRequest request,
         LedgerDbContext db,
         TimeProvider clock,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         var original = await db.JournalEntries
@@ -143,7 +148,7 @@ internal static class JournalEndpoints
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var closedThrough = await db.HoldPeriodsOpenAsync(cancellationToken);
 
-        var reversal = original.Reverse(request.EntryDate, closedThrough, clock.GetUtcNow());
+        var reversal = original.Reverse(request.EntryDate, closedThrough, user.Name(), clock.GetUtcNow());
         db.JournalEntries.Add(reversal);
 
         try

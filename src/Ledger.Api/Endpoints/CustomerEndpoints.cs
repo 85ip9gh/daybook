@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
 using Ledger.Domain.Receivables;
 using Microsoft.EntityFrameworkCore;
@@ -9,9 +11,9 @@ internal static class CustomerEndpoints
     public static IEndpointRouteBuilder MapCustomerEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/customers").WithTags("Receivables");
-        group.MapPost("/", RegisterAsync);
-        group.MapGet("/", ListAsync);
-        group.MapGet("/{id:guid}/receivables", ReceivablesAsync);
+        group.MapPost("/", RegisterAsync).RequireAuthorization(Policies.Record);
+        group.MapGet("/", ListAsync).RequireAuthorization(Policies.Read);
+        group.MapGet("/{id:guid}/receivables", ReceivablesAsync).RequireAuthorization(Policies.Read);
         return routes;
     }
 

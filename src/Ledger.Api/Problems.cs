@@ -27,12 +27,19 @@ internal sealed class LedgerRuleExceptionHandler(IProblemDetailsService problemD
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        if (exception is not LedgerRuleException rule)
+        var (status, title, code) = exception switch
+        {
+            LedgerRuleException rule => (StatusCodes.Status422UnprocessableEntity, "Ledger rule violated", rule.Code),
+            SegregationOfDutiesException => (StatusCodes.Status403Forbidden, "Forbidden", SegregationOfDutiesException.Code),
+            _ => (0, string.Empty, string.Empty),
+        };
+
+        if (status == 0)
         {
             return false;
         }
 
-        httpContext.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+        httpContext.Response.StatusCode = status;
 
         return await problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
@@ -40,10 +47,10 @@ internal sealed class LedgerRuleExceptionHandler(IProblemDetailsService problemD
             Exception = exception,
             ProblemDetails = new ProblemDetails
             {
-                Status = StatusCodes.Status422UnprocessableEntity,
-                Title = "Ledger rule violated",
-                Detail = rule.Message,
-                Extensions = { ["code"] = rule.Code },
+                Status = status,
+                Title = title,
+                Detail = exception.Message,
+                Extensions = { ["code"] = code },
             },
         });
     }
