@@ -359,6 +359,142 @@ table.ledger .code {
   color: var(--danger);
 }
 
+.status.paid,
+.status.processed {
+  color: var(--accent);
+}
+
+.status.void,
+.status.failed {
+  color: var(--danger);
+}
+
+.status.draft,
+.status.pending,
+.status.processing {
+  color: var(--ink-soft);
+}
+
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
+  margin: 0;
+}
+
+.figures.ruled {
+  padding-bottom: var(--space-5);
+  border-bottom: var(--hairline) solid var(--rule);
+}
+
+.figures div,
+.facts div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.figures dt,
+.facts dt {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.figures dd {
+  margin: 0;
+  font-family: var(--font-figure);
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-7);
+  margin: 0;
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.code {
+  font-family: var(--font-figure);
+  font-size: var(--text-sm);
+}
+
+.inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: var(--hairline) solid var(--rule);
+}
+
+.stack > .inline-form:first-child {
+  padding-top: 0;
+  padding-bottom: var(--space-5);
+  border-top: 0;
+  border-bottom: var(--hairline) solid var(--rule);
+}
+
+.field.narrow input {
+  width: 7rem;
+}
+
+.field.wide input {
+  width: 18rem;
+  max-width: 100%;
+}
+
+fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.check input {
+  width: auto;
+  height: auto;
+  accent-color: var(--accent);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+a.button:hover {
+  text-decoration: none;
+}
+
+a.button.primary:hover {
+  color: var(--surface);
+}
+
 .stack {
   display: flex;
   flex-direction: column;
@@ -389,6 +525,10 @@ table.ledger .code {
 
   .wide-only {
     display: none;
+  }
+
+  .split {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

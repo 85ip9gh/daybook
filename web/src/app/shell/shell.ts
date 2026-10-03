@@ -24,11 +24,22 @@ const navigation: NavGroup[] = [
   },
   {
     title: 'Receivables',
-    items: [{ label: 'Aged receivables', path: '/receivables/aged', roles: READERS }],
+    items: [
+      { label: 'Customers', path: '/receivables/customers', roles: READERS },
+      { label: 'Invoices', path: '/receivables/invoices', roles: READERS },
+      { label: 'Aged receivables', path: '/receivables/aged', roles: READERS },
+    ],
+  },
+  {
+    title: 'Banking',
+    items: [{ label: 'Reconciliation', path: '/banking', roles: READERS }],
   },
   {
     title: 'Control',
-    items: [{ label: 'Periods', path: '/periods', roles: READERS }],
+    items: [
+      { label: 'Periods', path: '/periods', roles: READERS },
+      { label: 'Users', path: '/admin/users', roles: ['Admin'] },
+    ],
   },
 ];
 

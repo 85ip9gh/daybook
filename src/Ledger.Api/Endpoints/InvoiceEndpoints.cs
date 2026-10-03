@@ -9,10 +9,13 @@ namespace Ledger.Api.Endpoints;
 
 internal static class InvoiceEndpoints
 {
+    public const int MaxListed = 200;
+
     public static IEndpointRouteBuilder MapInvoiceEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/invoices").WithTags("Receivables");
         group.MapPost("/", DraftAsync).RequireAuthorization(Policies.Record);
+        group.MapGet("/", ListAsync).RequireAuthorization(Policies.Read);
         group.MapGet("/{id:guid}", GetAsync).RequireAuthorization(Policies.Read);
         group.MapPost("/{id:guid}/issue", IssueAsync).RequireAuthorization(Policies.Post);
         group.MapPost("/{id:guid}/void", VoidAsync).RequireAuthorization(Policies.Post);
@@ -50,6 +53,20 @@ internal static class InvoiceEndpoints
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.Created($"/invoices/{invoice.Id}", invoice.ToResponse());
+    }
+
+    private static async Task<IResult> ListAsync(InvoiceStatus? status, Guid? customerId, LedgerDbContext db, CancellationToken cancellationToken)
+    {
+        var invoices = await db.Invoices
+            .AsNoTracking()
+            .Include(invoice => invoice.Lines)
+            .Where(invoice => (status == null || invoice.Status == status) && (customerId == null || invoice.CustomerId == customerId))
+            .OrderBy(invoice => invoice.Number == null ? 0 : 1)
+            .ThenByDescending(invoice => invoice.Number)
+            .Take(MaxListed)
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(invoices.Select(invoice => invoice.ToResponse()));
     }
 
     private static async Task<IResult> GetAsync(Guid id, LedgerDbContext db, CancellationToken cancellationToken)

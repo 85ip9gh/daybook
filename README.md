@@ -62,11 +62,12 @@ A bank statement is uploaded as CSV, accepted at once with `202`, and parsed and
 src/Ledger.Domain   entities and rules, no dependencies
 src/Ledger.Api      endpoints, EF Core mapping, migrations
 tests/Ledger.Domain.Tests   113 tests, no database, no container
-tests/Ledger.Api.Tests      107 tests against SQL Server 2022 in a container
+tests/Ledger.Api.Tests      109 tests against SQL Server 2022 in a container
 tools/Ledger.Bench  seeds a large journal and measures the balance queries
 tools/seed-demo.mjs fills an empty database with a small set of books and demo users
 docs/tuning.md      what was measured, on what, and what it does not show
-web/                Angular front end, 38 tests, described in web/README.md
+docs/sample-statement.csv  a bank statement that fits the demo data, to try the import
+web/                Angular front end, 69 tests, described in web/README.md
 ```
 
 The domain project references nothing outside the base class library. Every bookkeeping rule lives there and is tested without a database.
@@ -101,6 +102,7 @@ Every `GET` below needs Viewer, Clerk, Approver or Controller unless the table s
 | GET | `/customers` | read | List customers |
 | GET | `/customers/{id}/receivables` | read | Open invoices and the total owed |
 | POST | `/invoices` | Clerk | Draft an invoice |
+| GET | `/invoices?status=&customerId=` | read | List invoices, drafts first |
 | GET | `/invoices/{id}` | read | Read an invoice |
 | POST | `/invoices/{id}/issue` | Approver | Number it and post it |
 | POST | `/invoices/{id}/void` | Approver | Void an unpaid invoice by reversing its entry |
@@ -108,6 +110,7 @@ Every `GET` below needs Viewer, Clerk, Approver or Controller unless the table s
 | GET | `/payments/{id}` | read | Read a payment |
 | GET | `/openapi/v1.json` | public | OpenAPI document |
 | POST | `/bank-accounts/{accountId}/statements` | Clerk | Upload a CSV statement, answered `202` |
+| GET | `/bank-accounts/{accountId}/statements` | read | The twenty most recent imports |
 | GET | `/bank-statements/{id}` | read | Status, counts and any error |
 | GET | `/bank-accounts/{accountId}/reconciliation?asOf=` | read | Both unreconciled sides and their totals |
 | POST | `/bank-lines/{id}/match` | Approver | Match a bank line to a journal line by hand |

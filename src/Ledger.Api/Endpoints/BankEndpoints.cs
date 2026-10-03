@@ -47,11 +47,14 @@ public sealed record MatchRequest(Guid JournalEntryId, int LineNumber);
 
 internal static class BankEndpoints
 {
+    public const int RecentStatements = 20;
+
     public static IEndpointRouteBuilder MapBankEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/").WithTags("Banking");
         group.MapPost("/bank-accounts/{accountId:guid}/statements", ImportAsync).RequireAuthorization(Policies.Record);
         group.MapGet("/bank-accounts/{accountId:guid}/reconciliation", ReconciliationAsync).RequireAuthorization(Policies.Read);
+        group.MapGet("/bank-accounts/{accountId:guid}/statements", StatementsAsync).RequireAuthorization(Policies.Read);
         group.MapGet("/bank-statements/{id:guid}", StatementAsync).RequireAuthorization(Policies.Read);
         group.MapPost("/bank-lines/{id:guid}/match", MatchAsync).RequireAuthorization(Policies.Post);
         group.MapPost("/bank-lines/{id:guid}/unmatch", UnmatchAsync).RequireAuthorization(Policies.Post);
@@ -124,6 +127,30 @@ internal static class BankEndpoints
     {
         http.Response.Headers[Idempotency.ReplayHeader] = "true";
         return Results.Ok(ToResponse(statement));
+    }
+
+    private static async Task<IResult> StatementsAsync(Guid accountId, LedgerDbContext db, CancellationToken cancellationToken)
+    {
+        var statements = await db.BankStatements
+            .AsNoTracking()
+            .Where(statement => statement.AccountId == accountId)
+            .OrderByDescending(statement => statement.ImportedAt)
+            .Take(RecentStatements)
+            .Select(statement => new StatementResponse(
+                statement.Id,
+                statement.AccountId,
+                statement.Status,
+                statement.Attempts,
+                statement.LineCount,
+                statement.NewLineCount,
+                statement.MatchedCount,
+                statement.Error,
+                statement.ImportedBy,
+                statement.ImportedAt,
+                statement.ProcessedAt))
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(statements);
     }
 
     private static async Task<IResult> StatementAsync(Guid id, LedgerDbContext db, CancellationToken cancellationToken)

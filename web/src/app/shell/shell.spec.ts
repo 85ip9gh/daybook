@@ -25,7 +25,10 @@ describe('Shell', () => {
     expect(await linksFor(['Viewer'])).toEqual([
       'Trial balance',
       'Accounts',
+      'Customers',
+      'Invoices',
       'Aged receivables',
+      'Reconciliation',
       'Periods',
     ]);
   });
@@ -34,7 +37,7 @@ describe('Shell', () => {
     expect(await linksFor(['Approver'])).toContain('New journal entry');
   });
 
-  it('shows an administrator no books at all', async () => {
-    expect(await linksFor(['Admin'])).toEqual([]);
+  it('shows an administrator the users screen and no books', async () => {
+    expect(await linksFor(['Admin'])).toEqual(['Users']);
   });
 });
