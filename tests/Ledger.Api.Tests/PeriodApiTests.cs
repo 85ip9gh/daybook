@@ -167,7 +167,9 @@ public class PeriodApiTests(LedgerApiFixture api)
                 Assert.Equal("period_closed", await LedgerApiFixture.ProblemCodeAsync(response));
             }
 
-            var journal = (await api.BalanceAsync(cash.Id, period.End)).Debits;
+            var journal = await api.QueryAsync(db => db.JournalLines
+                .Where(line => line.AccountId == cash.Id && line.EntryDate <= period.End && line.Side == EntrySide.Debit)
+                .SumAsync(line => line.Amount));
             var snapshot = await api.QueryAsync(db => db.PeriodBalances
                 .Where(balance => balance.PeriodEnd == period.End && balance.AccountId == cash.Id)
                 .Select(balance => (decimal?)balance.Debits)

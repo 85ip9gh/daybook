@@ -129,7 +129,7 @@ internal static class InvoiceEndpoints
             return NotFound(id);
         }
 
-        invoice.Void(user.Name());
+        invoice.Void(user.Name(), request.VoidDate);
 
         var issued = await db.JournalEntries
             .AsNoTracking()

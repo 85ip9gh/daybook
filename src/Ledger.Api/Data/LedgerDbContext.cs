@@ -122,7 +122,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
                 .WithMany()
                 .HasForeignKey(l => l.AccountId)
                 .OnDelete(DeleteBehavior.Restrict);
-            line.HasIndex(l => l.AccountId);
+            line.HasIndex(l => new { l.AccountId, l.EntryDate }).IncludeProperties(l => new { l.Side, l.Amount });
             line.ToTable(table =>
             {
                 table.HasCheckConstraint("CK_JournalLines_Amount_Positive", "[Amount] > 0");

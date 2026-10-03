@@ -377,12 +377,17 @@ namespace Ledger.Api.Data.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("decimal(19,4)");
 
+                    b.Property<DateOnly>("EntryDate")
+                        .HasColumnType("date");
+
                     b.Property<byte>("Side")
                         .HasColumnType("tinyint");
 
                     b.HasKey("JournalEntryId", "LineNumber");
 
-                    b.HasIndex("AccountId");
+                    b.HasIndex("AccountId", "EntryDate");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("AccountId", "EntryDate"), new[] { "Side", "Amount" });
 
                     b.ToTable("JournalLines", t =>
                         {
@@ -488,6 +493,9 @@ namespace Ledger.Api.Data.Migrations
                     b.Property<string>("VoidedBy")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateOnly?>("VoidedOn")
+                        .HasColumnType("date");
 
                     b.HasKey("Id");
 
