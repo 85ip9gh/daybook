@@ -12,7 +12,7 @@ The interesting part is not the endpoints. It is that the rules of bookkeeping h
 - **That holds under concurrency.** The key is a primary key and it is written in the same transaction as the entry. Concurrent requests with one key race on the constraint, one commits, and the rest read the winner back.
 - **An entry is reversed at most once.** A filtered unique index on `ReversesEntryId` decides concurrent reversals, not a check in application code.
 - **Money is `decimal(19,4)`.** Amounts are positive, carry at most four decimal places, and are never floating point. The database repeats the positive-amount rule as a check constraint.
-- **Live balances are derived.** No running balance is stored, so there is nothing to drift out of step with the journal. A balance is a `SUM` over lines up to a date.
+- **Balances are derived, never edited.** No running balance is stored. A balance is the totals frozen at the last period close plus a `SUM` over the lines dated after it, and a test checks that against the raw journal on both sides of a close.
 - **A closed period stays closed.** Closing a month refuses every later post or reversal dated on or before its last day, and records each account's totals as of that day. The books only close forward.
 - **A close and a post cannot interleave.** Every post reads the closed-through date with `HOLDLOCK` inside its transaction, which holds a shared lock until commit. The close updates that row, so it waits for every post already in flight, and every post that starts later sees the new date. The snapshot therefore contains exactly the entries dated in the period. The hint is explicit so the lock is taken even where read committed snapshot isolation is on, as it is by default on Azure SQL.
 
@@ -50,13 +50,21 @@ A bank statement is uploaded as CSV, accepted at once with `202`, and parsed and
 - **What the matcher cannot place waits for a person.** An approver matches or unmatches by hand. Amounts must be equal, and bank lines carry a `rowversion` token.
 - **The report shows both sides.** Bank lines not in the books, ledger lines not at the bank, and the two totals that must agree once they are removed.
 
+### Reports and query tuning
+
+- **Income statement, balance sheet, aged receivables and an account statement.** The balance sheet reports whether it balances. Aged receivables answer for any past date: payments and voids dated after it are ignored. The account statement computes its running balance in SQL with a window function.
+- **The balance query was measured and tuned.** On 2,000,000 journal lines, one account's balance went from 41.7 ms and 38,810 logical reads to 1.3 ms and 11. The trial balance went from 66.8 ms to 19.5 ms. The method, the full table, an index that was measured and rejected, and what the numbers do not show are in [docs/tuning.md](docs/tuning.md).
+- **The entry date is copied onto every line** so a balance needs one index and no join. A foreign key on the pair makes the database refuse a line whose date differs from its entry, so the copy cannot drift.
+
 ## Layout
 
 ```
 src/Ledger.Domain   entities and rules, no dependencies
 src/Ledger.Api      endpoints, EF Core mapping, migrations
-tests/Ledger.Domain.Tests   97 tests, no database, no container
-tests/Ledger.Api.Tests      99 tests against SQL Server 2022 in a container
+tests/Ledger.Domain.Tests   113 tests, no database, no container
+tests/Ledger.Api.Tests      107 tests against SQL Server 2022 in a container
+tools/Ledger.Bench  seeds a large journal and measures the balance queries
+docs/tuning.md      what was measured, on what, and what it does not show
 ```
 
 The domain project references nothing outside the base class library. Every bookkeeping rule lives there and is tested without a database.
@@ -80,6 +88,10 @@ Every `GET` below needs Viewer, Clerk, Approver or Controller unless the table s
 | GET | `/journal-entries/{id}` | read | Read an entry |
 | POST | `/journal-entries/{id}/reversal` | Approver | Reverse an entry |
 | GET | `/trial-balance?asOf=` | read | Trial balance |
+| GET | `/reports/income-statement?from=&to=` | read | Revenue, expenses and net income for a range |
+| GET | `/reports/balance-sheet?asOf=` | read | Assets, liabilities, equity and current earnings |
+| GET | `/reports/aged-receivables?asOf=` | read | What each customer owed on a date, by how overdue |
+| GET | `/accounts/{id}/statement?from=&to=` | read | Lines with a running balance |
 | GET | `/periods` | read | Closed-through date and recorded closes |
 | POST | `/periods/{year}/{month}/close` | Controller | Close the books through that month |
 | GET | `/periods/{year}/{month}/trial-balance` | read | Trial balance frozen at that close |
@@ -137,6 +149,9 @@ ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Pass
 - One test enumerates every mapped route and calls it with no token. Anything other than the three public routes that does not answer `401` fails it. With the fallback policy removed and one route left without a policy, the test failed and named that route.
 - Tokens that are expired, for another audience, from another issuer, signed with another key, unsigned, or garbage are each refused, and a token built the same way with nothing wrong is accepted. With lifetime validation turned off only the expired case failed, and with audience validation turned off only the audience case failed.
 - A table of 22 role and route pairs checks that each role reaches its own routes and gets `403` on the others.
+- A balance read through the close snapshot is compared with a direct sum over the journal on five dates around a close. With the snapshot day counted twice, that test failed with 140 against 120.
+- One test migrates a database to the previous schema, inserts an entry by hand, runs the new migration and checks the date reached the lines. With the backfill removed, the migration itself failed on the foreign key.
+- The balance sheet of everything every test has posted must balance.
 - Four statements of five identical lines are processed in parallel against five identical ledger lines. Exactly five bank lines end up matched, each to a different ledger line, and all four statements finish. With the race handling disabled the same test failed three runs of three on the unique index, so the race is real and the retry is what absorbs it.
 - A statement left in `Processing` with an hour-old claim is finished by the worker. With stale claims no longer reclaimed, that test timed out.
 - An overlapping statement adds only its new line. With the duplicate check removed, it failed instead.
@@ -147,6 +162,9 @@ ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Pass
 
 ## Limitations
 
+- The tuning numbers come from one desktop, a warm cache, one user and synthetic data. Write cost was not measured.
+- An account statement returns at most 1,000 lines and says when it was cut short. There is no paging.
+- There are no year-end closing entries, so the balance sheet carries all earnings as one current figure.
 - Matching is one bank line to one ledger line with equal amounts. A deposit that covers three ledger lines, or a ledger line settled by two bank lines, has to be handled outside it.
 - An entry and its reversal on a bank account both stay on the unreconciled list, although they net to zero.
 - The reconciliation totals agree only for a date on or after both sides of every match.

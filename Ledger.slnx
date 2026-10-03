@@ -7,4 +7,7 @@
     <Project Path="tests/Ledger.Api.Tests/Ledger.Api.Tests.csproj" />
     <Project Path="tests/Ledger.Domain.Tests/Ledger.Domain.Tests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Ledger.Bench/Ledger.Bench.csproj" />
+  </Folder>
 </Solution>

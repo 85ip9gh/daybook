@@ -127,7 +127,7 @@ public sealed class JournalEntry
 
         for (var index = 0; index < lines.Count; index++)
         {
-            entry._lines.Add(new JournalLine(entry.Id, index + 1, lines[index].AccountId, lines[index].Side, lines[index].Amount));
+            entry._lines.Add(new JournalLine(entry.Id, entry.EntryDate, index + 1, lines[index].AccountId, lines[index].Side, lines[index].Amount));
         }
 
         return entry;
@@ -162,7 +162,7 @@ public sealed class JournalEntry
         foreach (var line in _lines.OrderBy(line => line.LineNumber))
         {
             var opposite = line.Side == EntrySide.Debit ? EntrySide.Credit : EntrySide.Debit;
-            reversal._lines.Add(new JournalLine(reversal.Id, line.LineNumber, line.AccountId, opposite, line.Amount));
+            reversal._lines.Add(new JournalLine(reversal.Id, reversal.EntryDate, line.LineNumber, line.AccountId, opposite, line.Amount));
         }
 
         return reversal;

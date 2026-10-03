@@ -67,7 +67,7 @@ public class ActorTests
         var invoice = Draft("amira");
 
         invoice.Issue(1, Today, Today, "jonas");
-        invoice.Void("priya");
+        invoice.Void("priya", new DateOnly(2026, 10, 2));
 
         Assert.Equal(("amira", "jonas", "priya"), (invoice.DraftedBy, invoice.IssuedBy, invoice.VoidedBy));
     }

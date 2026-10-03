@@ -48,6 +48,9 @@ public sealed class LedgerApiFixture : IAsyncLifetime
 
     public IServiceProvider Services => _factory!.Services;
 
+    public string ConnectionStringFor(string database) =>
+        new SqlConnectionStringBuilder(_sql.GetConnectionString()) { InitialCatalog = database }.ConnectionString;
+
     public HttpClient NewClient(string? bearer = null)
     {
         var client = _factory!.CreateClient();

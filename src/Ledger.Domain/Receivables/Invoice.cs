@@ -92,6 +92,8 @@ public sealed class Invoice
 
     public string? VoidedBy { get; private set; }
 
+    public DateOnly? VoidedOn { get; private set; }
+
     public IReadOnlyList<InvoiceLine> Lines => _lines;
 
     public decimal Outstanding => Status == InvoiceStatus.Issued ? Total - AmountPaid : 0m;
@@ -228,7 +230,7 @@ public sealed class Invoice
 
     public void RecordPosting(Guid journalEntryId) => JournalEntryId = journalEntryId;
 
-    public void Void(string? voidedBy)
+    public void Void(string? voidedBy, DateOnly voidedOn)
     {
         var voider = Actor.Require(voidedBy);
 
@@ -239,6 +241,7 @@ public sealed class Invoice
 
         Status = InvoiceStatus.Void;
         VoidedBy = voider;
+        VoidedOn = voidedOn;
     }
 
     internal void Apply(decimal amount)

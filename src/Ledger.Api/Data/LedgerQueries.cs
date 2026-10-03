@@ -5,6 +5,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Ledger.Api.Data;
 
+public sealed class StatementRow
+{
+    public Guid JournalEntryId { get; init; }
+
+    public int LineNumber { get; init; }
+
+    public DateOnly EntryDate { get; init; }
+
+    public string Description { get; init; } = string.Empty;
+
+    public byte Side { get; init; }
+
+    public decimal Amount { get; init; }
+
+    public decimal RunningDebits { get; init; }
+
+    public decimal RunningCredits { get; init; }
+}
+
 internal static class LedgerQueries
 {
     private const int DuplicateIndexRow = 2601;
@@ -16,11 +35,45 @@ internal static class LedgerQueries
         Guid? accountId,
         CancellationToken cancellationToken)
     {
-        var lines =
-            from line in db.JournalLines.AsNoTracking()
-            join entry in db.JournalEntries.AsNoTracking() on line.JournalEntryId equals entry.Id
-            where entry.EntryDate <= asOf
-            select line;
+        var closed = await db.PeriodCloses
+            .Where(close => close.PeriodEnd <= asOf)
+            .MaxAsync(close => (DateOnly?)close.PeriodEnd, cancellationToken);
+
+        var totals = new Dictionary<Guid, AccountTotals>();
+
+        if (closed is not null)
+        {
+            var opening = await db.PeriodBalances
+                .AsNoTracking()
+                .Where(balance => balance.PeriodEnd == closed && (accountId == null || balance.AccountId == accountId))
+                .ToListAsync(cancellationToken);
+
+            foreach (var balance in opening)
+            {
+                totals[balance.AccountId] = new AccountTotals(balance.AccountId, balance.Debits, balance.Credits);
+            }
+        }
+
+        var since = await db.ActivityAsync(closed?.AddDays(1) ?? DateOnly.MinValue, asOf, accountId, cancellationToken);
+
+        foreach (var activity in since)
+        {
+            totals[activity.AccountId] = totals.TryGetValue(activity.AccountId, out var opening)
+                ? new AccountTotals(activity.AccountId, opening.Debits + activity.Debits, opening.Credits + activity.Credits)
+                : activity;
+        }
+
+        return [.. totals.Values];
+    }
+
+    public static async Task<List<AccountTotals>> ActivityAsync(
+        this LedgerDbContext db,
+        DateOnly earliest,
+        DateOnly latest,
+        Guid? accountId,
+        CancellationToken cancellationToken)
+    {
+        var lines = db.JournalLines.AsNoTracking().Where(line => line.EntryDate >= earliest && line.EntryDate <= latest);
 
         if (accountId is not null)
         {
@@ -39,6 +92,34 @@ internal static class LedgerQueries
 
         return [.. totals.Select(total => new AccountTotals(total.AccountId, total.Debits, total.Credits))];
     }
+
+    public static Task<List<StatementRow>> StatementAsync(
+        this LedgerDbContext db,
+        Guid accountId,
+        DateOnly earliest,
+        DateOnly latest,
+        int take,
+        CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQuery<StatementRow>(
+                $"""
+                SELECT TOP ({take})
+                       line.JournalEntryId,
+                       line.LineNumber,
+                       line.EntryDate,
+                       entry.Description,
+                       line.Side,
+                       line.Amount,
+                       SUM(CASE WHEN line.Side = 1 THEN line.Amount ELSE 0 END)
+                           OVER (ORDER BY line.EntryDate, entry.RecordedAt, line.JournalEntryId, line.LineNumber ROWS UNBOUNDED PRECEDING) AS RunningDebits,
+                       SUM(CASE WHEN line.Side = 2 THEN line.Amount ELSE 0 END)
+                           OVER (ORDER BY line.EntryDate, entry.RecordedAt, line.JournalEntryId, line.LineNumber ROWS UNBOUNDED PRECEDING) AS RunningCredits
+                FROM JournalLines AS line
+                JOIN JournalEntries AS entry ON entry.Id = line.JournalEntryId
+                WHERE line.AccountId = {accountId} AND line.EntryDate >= {earliest} AND line.EntryDate <= {latest}
+                ORDER BY line.EntryDate, entry.RecordedAt, line.JournalEntryId, line.LineNumber
+                """)
+            .ToListAsync(cancellationToken);
 
     public static async Task<DateOnly?> HoldPeriodsOpenAsync(this LedgerDbContext db, CancellationToken cancellationToken)
     {
@@ -73,8 +154,7 @@ internal static class LedgerQueries
                    SUM(CASE WHEN line.Side = 1 THEN line.Amount ELSE 0 END),
                    SUM(CASE WHEN line.Side = 2 THEN line.Amount ELSE 0 END)
             FROM JournalLines AS line
-            JOIN JournalEntries AS entry ON entry.Id = line.JournalEntryId
-            WHERE entry.EntryDate <= {periodEnd}
+            WHERE line.EntryDate <= {periodEnd}
             GROUP BY line.AccountId
             """,
             cancellationToken);
@@ -100,14 +180,13 @@ internal static class LedgerQueries
         DateOnly latest,
         CancellationToken cancellationToken)
     {
-        var lines = await (
-            from line in db.JournalLines.AsNoTracking()
-            join entry in db.JournalEntries.AsNoTracking() on line.JournalEntryId equals entry.Id
-            where line.AccountId == accountId
-                && entry.EntryDate >= earliest
-                && entry.EntryDate <= latest
-                && !db.BankLines.Any(bank => bank.MatchedEntryId == line.JournalEntryId && bank.MatchedLineNumber == line.LineNumber)
-            select new { line.JournalEntryId, line.LineNumber, entry.EntryDate, line.Side, line.Amount })
+        var lines = await db.JournalLines
+            .AsNoTracking()
+            .Where(line => line.AccountId == accountId
+                && line.EntryDate >= earliest
+                && line.EntryDate <= latest
+                && !db.BankLines.Any(bank => bank.MatchedEntryId == line.JournalEntryId && bank.MatchedLineNumber == line.LineNumber))
+            .Select(line => new { line.JournalEntryId, line.LineNumber, line.EntryDate, line.Side, line.Amount })
             .ToListAsync(cancellationToken);
 
         return [.. lines.Select(line => new LedgerItem(line.JournalEntryId, line.LineNumber, line.EntryDate, BankLine.Signed(line.Side, line.Amount)))];

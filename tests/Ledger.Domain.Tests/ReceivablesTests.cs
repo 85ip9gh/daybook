@@ -195,9 +195,9 @@ public class ReceivablesTests
         Payment.Receive(CustomerId, IssueDate, 10m, "CAD", _bank.Id, [new AllocationDraft(paid.Id, 10m)], new[] { paid }.ToDictionary(invoice => invoice.Id), "clerk");
         var clean = Issued(100m);
 
-        Assert.Equal("invoice_not_voidable", CodeOf(() => draft.Void("approver")));
-        Assert.Equal("invoice_not_voidable", CodeOf(() => paid.Void("approver")));
-        clean.Void("approver");
+        Assert.Equal("invoice_not_voidable", CodeOf(() => draft.Void("approver", new DateOnly(2026, 10, 2))));
+        Assert.Equal("invoice_not_voidable", CodeOf(() => paid.Void("approver", new DateOnly(2026, 10, 2))));
+        clean.Void("approver", new DateOnly(2026, 10, 2));
         Assert.Equal((InvoiceStatus.Void, 0m), (clean.Status, clean.Outstanding));
     }
 }

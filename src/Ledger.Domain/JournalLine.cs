@@ -8,9 +8,10 @@ public sealed class JournalLine
     {
     }
 
-    internal JournalLine(Guid journalEntryId, int lineNumber, Guid accountId, EntrySide side, decimal amount)
+    internal JournalLine(Guid journalEntryId, DateOnly entryDate, int lineNumber, Guid accountId, EntrySide side, decimal amount)
     {
         JournalEntryId = journalEntryId;
+        EntryDate = entryDate;
         LineNumber = lineNumber;
         AccountId = accountId;
         Side = side;
@@ -18,6 +19,8 @@ public sealed class JournalLine
     }
 
     public Guid JournalEntryId { get; private set; }
+
+    public DateOnly EntryDate { get; private set; }
 
     public int LineNumber { get; private set; }
 
