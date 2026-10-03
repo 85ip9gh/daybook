@@ -1,3 +1,4 @@
+using Ledger.Api.Auth;
 using Ledger.Domain;
 using Ledger.Domain.Receivables;
 using Microsoft.EntityFrameworkCore;
@@ -30,9 +31,22 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
 
     public DbSet<NumberSequence> Sequences => Set<NumberSequence>();
 
+    public DbSet<AppUser> Users => Set<AppUser>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ReceivablesModel.Configure(modelBuilder);
+
+        modelBuilder.Entity<AppUser>(user =>
+        {
+            user.ToTable("Users");
+            user.HasKey(u => u.Id);
+            user.Property(u => u.Id).ValueGeneratedNever();
+            user.Property(u => u.UserName).HasMaxLength(AppUser.MaxUserNameLength).IsUnicode(false);
+            user.Property(u => u.PasswordHash).HasMaxLength(256).IsUnicode(false);
+            user.Property(u => u.Roles).HasConversion<int>();
+            user.HasIndex(u => u.UserName).IsUnique();
+        });
 
         modelBuilder.Entity<LedgerState>(state =>
         {
@@ -42,7 +56,11 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             state.HasData(new LedgerState());
         });
 
-        modelBuilder.Entity<PeriodClose>(close => close.HasKey(c => c.PeriodEnd));
+        modelBuilder.Entity<PeriodClose>(close =>
+        {
+            close.HasKey(c => c.PeriodEnd);
+            close.Property(c => c.ClosedBy).HasMaxLength(Actor.MaxLength);
+        });
 
         modelBuilder.Entity<PeriodBalance>(balance =>
         {
@@ -76,6 +94,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
             entry.Property(e => e.Id).ValueGeneratedNever();
             entry.Property(e => e.Description).HasMaxLength(JournalEntry.MaxDescriptionLength);
             entry.Property(e => e.Currency).HasMaxLength(3).IsFixedLength().IsUnicode(false);
+            entry.Property(e => e.PostedBy).HasMaxLength(Actor.MaxLength);
             entry.HasIndex(e => e.EntryDate);
             entry.HasOne<JournalEntry>()
                 .WithOne()

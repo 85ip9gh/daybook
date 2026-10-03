@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
 using Ledger.Domain;
 using Ledger.Domain.Receivables;
@@ -11,8 +13,8 @@ internal static class PaymentEndpoints
     public static IEndpointRouteBuilder MapPaymentEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/payments").WithTags("Receivables");
-        group.MapPost("/", ReceiveAsync);
-        group.MapGet("/{id:guid}", GetAsync);
+        group.MapPost("/", ReceiveAsync).RequireAuthorization(Policies.Record);
+        group.MapGet("/{id:guid}", GetAsync).RequireAuthorization(Policies.Read);
         return routes;
     }
 
@@ -21,6 +23,7 @@ internal static class PaymentEndpoints
         [FromHeader(Name = Idempotency.KeyHeader)] string? idempotencyKey,
         LedgerDbContext db,
         TimeProvider clock,
+        ClaimsPrincipal user,
         HttpContext http,
         CancellationToken cancellationToken)
     {
@@ -58,7 +61,8 @@ internal static class PaymentEndpoints
             request.Currency,
             request.DepositAccountId,
             [.. request.Allocations.Select(allocation => new AllocationDraft(allocation.InvoiceId, allocation.Amount))],
-            invoices);
+            invoices,
+            user.Name());
 
         var entry = JournalEntry.Post(
             request.PaymentDate,
@@ -67,6 +71,7 @@ internal static class PaymentEndpoints
             received.Posting,
             await InvoiceEndpoints.AccountsForAsync(db, received.Posting, cancellationToken),
             closedThrough,
+            user.Name(),
             clock.GetUtcNow());
 
         received.Payment.RecordPosting(entry.Id);

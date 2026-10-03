@@ -43,6 +43,9 @@ internal static class ReceivablesModel
             invoice.Property(i => i.Id).ValueGeneratedNever();
             invoice.Property(i => i.Currency).HasMaxLength(3).IsFixedLength().IsUnicode(false);
             invoice.Property(i => i.Status).HasConversion<byte>();
+            invoice.Property(i => i.DraftedBy).HasMaxLength(Actor.MaxLength);
+            invoice.Property(i => i.IssuedBy).HasMaxLength(Actor.MaxLength);
+            invoice.Property(i => i.VoidedBy).HasMaxLength(Actor.MaxLength);
             invoice.Property(i => i.TaxRate).HasPrecision(9, 6);
             invoice.Property(i => i.Subtotal).HasPrecision(19, JournalEntry.AmountScale);
             invoice.Property(i => i.Tax).HasPrecision(19, JournalEntry.AmountScale);
@@ -77,6 +80,7 @@ internal static class ReceivablesModel
             payment.Property(p => p.Id).ValueGeneratedNever();
             payment.Property(p => p.Currency).HasMaxLength(3).IsFixedLength().IsUnicode(false);
             payment.Property(p => p.Amount).HasPrecision(19, JournalEntry.AmountScale);
+            payment.Property(p => p.ReceivedBy).HasMaxLength(Actor.MaxLength);
             payment.HasOne<Customer>().WithMany().HasForeignKey(p => p.CustomerId).OnDelete(DeleteBehavior.Restrict);
             payment.HasOne<Account>().WithMany().HasForeignKey(p => p.DepositAccountId).OnDelete(DeleteBehavior.Restrict);
             payment.HasOne<JournalEntry>().WithOne().HasForeignKey<Payment>(p => p.JournalEntryId).OnDelete(DeleteBehavior.Restrict);

@@ -24,6 +24,8 @@ public sealed class JournalEntry
 
     public Guid? ReversesEntryId { get; private set; }
 
+    public string PostedBy { get; private set; } = string.Empty;
+
     public DateTimeOffset RecordedAt { get; private set; }
 
     public IReadOnlyList<JournalLine> Lines => _lines;
@@ -35,6 +37,7 @@ public sealed class JournalEntry
         IReadOnlyList<LineDraft> lines,
         IReadOnlyDictionary<Guid, Account> accounts,
         DateOnly? closedThrough,
+        string? postedBy,
         DateTimeOffset recordedAt)
     {
         if (entryDate == default)
@@ -118,6 +121,7 @@ public sealed class JournalEntry
             EntryDate = entryDate,
             Description = trimmedDescription,
             Currency = entryCurrency,
+            PostedBy = Actor.Require(postedBy),
             RecordedAt = recordedAt,
         };
 
@@ -129,7 +133,7 @@ public sealed class JournalEntry
         return entry;
     }
 
-    public JournalEntry Reverse(DateOnly entryDate, DateOnly? closedThrough, DateTimeOffset recordedAt)
+    public JournalEntry Reverse(DateOnly entryDate, DateOnly? closedThrough, string? postedBy, DateTimeOffset recordedAt)
     {
         if (ReversesEntryId is not null)
         {
@@ -151,6 +155,7 @@ public sealed class JournalEntry
             Description = description.Length > MaxDescriptionLength ? description[..MaxDescriptionLength] : description,
             Currency = Currency,
             ReversesEntryId = Id,
+            PostedBy = Actor.Require(postedBy),
             RecordedAt = recordedAt,
         };
 

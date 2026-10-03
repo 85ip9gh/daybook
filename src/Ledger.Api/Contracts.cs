@@ -23,11 +23,12 @@ public sealed record EntryResponse(
     string Currency,
     Guid? ReversesEntryId,
     DateTimeOffset RecordedAt,
-    IReadOnlyList<LineResponse> Lines);
+    IReadOnlyList<LineResponse> Lines,
+    string PostedBy);
 
 public sealed record TrialBalanceResponse(DateOnly AsOf, IReadOnlyList<TrialBalanceRow> Rows, decimal TotalDebit, decimal TotalCredit);
 
-public sealed record PeriodCloseResponse(DateOnly PeriodEnd, DateTimeOffset ClosedAt);
+public sealed record PeriodCloseResponse(DateOnly PeriodEnd, DateTimeOffset ClosedAt, string ClosedBy);
 
 public sealed record PeriodsResponse(DateOnly? ClosedThrough, IReadOnlyList<PeriodCloseResponse> Closes);
 
@@ -46,5 +47,6 @@ internal static class ContractMappings
             entry.RecordedAt,
             [.. entry.Lines
                 .OrderBy(line => line.LineNumber)
-                .Select(line => new LineResponse(line.LineNumber, line.AccountId, line.Side, line.Amount))]);
+                .Select(line => new LineResponse(line.LineNumber, line.AccountId, line.Side, line.Amount))],
+            entry.PostedBy);
 }

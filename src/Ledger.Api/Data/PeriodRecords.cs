@@ -14,6 +14,8 @@ public sealed class PeriodClose
     public required DateOnly PeriodEnd { get; init; }
 
     public required DateTimeOffset ClosedAt { get; init; }
+
+    public required string ClosedBy { get; init; }
 }
 
 public sealed class PeriodBalance

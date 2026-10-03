@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
 using Ledger.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +11,10 @@ internal static class AccountEndpoints
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/accounts").WithTags("Accounts");
-        group.MapPost("/", OpenAsync);
-        group.MapGet("/", ListAsync);
-        group.MapPost("/{id:guid}/deactivate", DeactivateAsync);
-        group.MapGet("/{id:guid}/balance", BalanceAsync);
+        group.MapPost("/", OpenAsync).RequireAuthorization(Policies.Close);
+        group.MapGet("/", ListAsync).RequireAuthorization(Policies.Read);
+        group.MapPost("/{id:guid}/deactivate", DeactivateAsync).RequireAuthorization(Policies.Close);
+        group.MapGet("/{id:guid}/balance", BalanceAsync).RequireAuthorization(Policies.Read);
         return routes;
     }
 

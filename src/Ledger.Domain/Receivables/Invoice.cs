@@ -86,6 +86,12 @@ public sealed class Invoice
 
     public Guid? JournalEntryId { get; private set; }
 
+    public string DraftedBy { get; private set; } = string.Empty;
+
+    public string? IssuedBy { get; private set; }
+
+    public string? VoidedBy { get; private set; }
+
     public IReadOnlyList<InvoiceLine> Lines => _lines;
 
     public decimal Outstanding => Status == InvoiceStatus.Issued ? Total - AmountPaid : 0m;
@@ -96,7 +102,8 @@ public sealed class Invoice
         Guid receivableAccountId,
         IReadOnlyList<InvoiceLineDraft> lines,
         TaxDraft? tax,
-        IReadOnlyDictionary<Guid, Account> accounts)
+        IReadOnlyDictionary<Guid, Account> accounts,
+        string? draftedBy)
     {
         var invoiceCurrency = CurrencyCode.Parse(currency);
 
@@ -114,6 +121,7 @@ public sealed class Invoice
             Currency = invoiceCurrency,
             ReceivableAccountId = receivableAccountId,
             Status = InvoiceStatus.Draft,
+            DraftedBy = Actor.Require(draftedBy),
         };
 
         foreach (var line in lines)
@@ -178,10 +186,16 @@ public sealed class Invoice
         }
     }
 
-    public IReadOnlyList<LineDraft> Issue(int number, DateOnly issueDate, DateOnly dueDate)
+    public IReadOnlyList<LineDraft> Issue(int number, DateOnly issueDate, DateOnly dueDate, string? issuedBy)
     {
         EnsureDraft();
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        var issuer = Actor.Require(issuedBy);
+        if (Actor.Same(issuer, DraftedBy))
+        {
+            throw new SegregationOfDutiesException($"{issuer} drafted this invoice and cannot also issue it.");
+        }
 
         if (issueDate == default)
         {
@@ -197,6 +211,7 @@ public sealed class Invoice
         Number = number;
         IssueDate = issueDate;
         DueDate = dueDate;
+        IssuedBy = issuer;
 
         var posting = new List<LineDraft> { new(ReceivableAccountId, EntrySide.Debit, Total) };
         posting.AddRange(_lines
@@ -213,14 +228,17 @@ public sealed class Invoice
 
     public void RecordPosting(Guid journalEntryId) => JournalEntryId = journalEntryId;
 
-    public void Void()
+    public void Void(string? voidedBy)
     {
+        var voider = Actor.Require(voidedBy);
+
         if (Status != InvoiceStatus.Issued || AmountPaid != 0)
         {
             throw new LedgerRuleException("invoice_not_voidable", "Only an issued invoice with nothing paid against it can be voided.");
         }
 
         Status = InvoiceStatus.Void;
+        VoidedBy = voider;
     }
 
     internal void Apply(decimal amount)

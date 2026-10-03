@@ -46,6 +46,8 @@ public sealed class Payment
 
     public Guid JournalEntryId { get; private set; }
 
+    public string ReceivedBy { get; private set; } = string.Empty;
+
     public IReadOnlyList<PaymentAllocation> Allocations => _allocations;
 
     public static ReceivedPayment Receive(
@@ -55,7 +57,8 @@ public sealed class Payment
         string? currency,
         Guid depositAccountId,
         IReadOnlyList<AllocationDraft> allocations,
-        IReadOnlyDictionary<Guid, Invoice> invoices)
+        IReadOnlyDictionary<Guid, Invoice> invoices,
+        string? receivedBy)
     {
         if (paymentDate == default)
         {
@@ -87,6 +90,7 @@ public sealed class Payment
             Amount = amount,
             Currency = paymentCurrency,
             DepositAccountId = depositAccountId,
+            ReceivedBy = Actor.Require(receivedBy),
         };
 
         var credits = new List<LineDraft>();

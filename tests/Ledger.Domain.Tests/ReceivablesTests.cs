@@ -16,12 +16,12 @@ public class ReceivablesTests
     private Dictionary<Guid, Account> Accounts => new[] { _receivable, _services, _licences, _tax, _bank }.ToDictionary(account => account.Id);
 
     private Invoice Draft(TaxDraft? tax, params InvoiceLineDraft[] lines) =>
-        Invoice.Draft(CustomerId, "CAD", _receivable.Id, lines, tax, Accounts);
+        Invoice.Draft(CustomerId, "CAD", _receivable.Id, lines, tax, Accounts, "clerk");
 
     private Invoice Issued(decimal amount, int number = 1)
     {
         var invoice = Draft(null, new InvoiceLineDraft("Work", 1m, amount, _services.Id));
-        invoice.Issue(number, IssueDate, IssueDate.AddDays(30));
+        invoice.Issue(number, IssueDate, IssueDate.AddDays(30), "approver");
         return invoice;
     }
 
@@ -78,7 +78,7 @@ public class ReceivablesTests
     {
         Assert.Equal("revenue_account_invalid", CodeOf(() => Draft(null, new InvoiceLineDraft("Work", 1m, 10m, _bank.Id))));
         Assert.Equal("tax_account_invalid", CodeOf(() => Draft(new TaxDraft(0.14m, _services.Id), new InvoiceLineDraft("Work", 1m, 10m, _services.Id))));
-        Assert.Equal("receivable_account_invalid", CodeOf(() => Invoice.Draft(CustomerId, "CAD", _tax.Id, [new InvoiceLineDraft("Work", 1m, 10m, _services.Id)], null, Accounts)));
+        Assert.Equal("receivable_account_invalid", CodeOf(() => Invoice.Draft(CustomerId, "CAD", _tax.Id, [new InvoiceLineDraft("Work", 1m, 10m, _services.Id)], null, Accounts, "clerk")));
     }
 
     [Theory]
@@ -98,7 +98,7 @@ public class ReceivablesTests
             new InvoiceLineDraft("More hours", 1m, 50m, _services.Id),
             new InvoiceLineDraft("Seat", 1m, 30m, _licences.Id));
 
-        var posting = invoice.Issue(7, IssueDate, IssueDate.AddDays(30));
+        var posting = invoice.Issue(7, IssueDate, IssueDate.AddDays(30), "approver");
 
         Assert.Equal(
             [
@@ -109,7 +109,7 @@ public class ReceivablesTests
             ],
             posting);
         Assert.Equal((InvoiceStatus.Issued, 7, 205.20m), (invoice.Status, invoice.Number, invoice.Outstanding));
-        JournalEntry.Post(IssueDate, "Invoice 7", "CAD", posting, Accounts, null, DateTimeOffset.UnixEpoch);
+        JournalEntry.Post(IssueDate, "Invoice 7", "CAD", posting, Accounts, null, "poster", DateTimeOffset.UnixEpoch);
     }
 
     [Fact]
@@ -117,9 +117,9 @@ public class ReceivablesTests
     {
         var invoice = Draft(null, new InvoiceLineDraft("Work", 1m, 10m, _services.Id));
 
-        Assert.Equal("invoice_due_before_issue", CodeOf(() => invoice.Issue(1, IssueDate, IssueDate.AddDays(-1))));
-        invoice.Issue(1, IssueDate, IssueDate);
-        Assert.Equal("invoice_not_draft", CodeOf(() => invoice.Issue(2, IssueDate, IssueDate)));
+        Assert.Equal("invoice_due_before_issue", CodeOf(() => invoice.Issue(1, IssueDate, IssueDate.AddDays(-1), "approver")));
+        invoice.Issue(1, IssueDate, IssueDate, "approver");
+        Assert.Equal("invoice_not_draft", CodeOf(() => invoice.Issue(2, IssueDate, IssueDate, "approver")));
     }
 
     [Fact]
@@ -136,7 +136,8 @@ public class ReceivablesTests
             "CAD",
             _bank.Id,
             [new AllocationDraft(first.Id, 100m), new AllocationDraft(second.Id, 50m)],
-            invoices);
+            invoices,
+            "clerk");
 
         Assert.Equal(
             [new LineDraft(_bank.Id, EntrySide.Debit, 150m), new LineDraft(_receivable.Id, EntrySide.Credit, 150m)],
@@ -154,7 +155,7 @@ public class ReceivablesTests
         var draft = Draft(null, new InvoiceLineDraft("Work", 1m, 10m, _services.Id));
 
         string Receive(Guid customerId, DateOnly date, decimal amount, string currency, IReadOnlyDictionary<Guid, Invoice> known, params AllocationDraft[] allocations) =>
-            CodeOf(() => Payment.Receive(customerId, date, amount, currency, _bank.Id, allocations, known));
+            CodeOf(() => Payment.Receive(customerId, date, amount, currency, _bank.Id, allocations, known, "clerk"));
 
         Assert.Equal("payment_amount_invalid", Receive(CustomerId, IssueDate, 0m, "CAD", invoices, new AllocationDraft(invoice.Id, 10m)));
         Assert.Equal("payment_amount_invalid", Receive(CustomerId, IssueDate, 10.005m, "CAD", invoices, new AllocationDraft(invoice.Id, 10m)));
@@ -181,7 +182,7 @@ public class ReceivablesTests
             "CAD",
             _bank.Id,
             [new AllocationDraft(invoice.Id, 40m)],
-            new[] { invoice }.ToDictionary(invoice => invoice.Id)));
+            new[] { invoice }.ToDictionary(invoice => invoice.Id), "clerk"));
 
         Assert.Equal("payment_not_fully_allocated", code);
     }
@@ -191,12 +192,12 @@ public class ReceivablesTests
     {
         var draft = Draft(null, new InvoiceLineDraft("Work", 1m, 10m, _services.Id));
         var paid = Issued(100m);
-        Payment.Receive(CustomerId, IssueDate, 10m, "CAD", _bank.Id, [new AllocationDraft(paid.Id, 10m)], new[] { paid }.ToDictionary(invoice => invoice.Id));
+        Payment.Receive(CustomerId, IssueDate, 10m, "CAD", _bank.Id, [new AllocationDraft(paid.Id, 10m)], new[] { paid }.ToDictionary(invoice => invoice.Id), "clerk");
         var clean = Issued(100m);
 
-        Assert.Equal("invoice_not_voidable", CodeOf(draft.Void));
-        Assert.Equal("invoice_not_voidable", CodeOf(paid.Void));
-        clean.Void();
+        Assert.Equal("invoice_not_voidable", CodeOf(() => draft.Void("approver")));
+        Assert.Equal("invoice_not_voidable", CodeOf(() => paid.Void("approver")));
+        clean.Void("approver");
         Assert.Equal((InvoiceStatus.Void, 0m), (clean.Status, clean.Outstanding));
     }
 }

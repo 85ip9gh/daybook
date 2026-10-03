@@ -1,7 +1,10 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
+using Ledger.Api.Endpoints;
 using Ledger.Domain;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
@@ -23,7 +26,53 @@ public sealed class LedgerApiFixture : IAsyncLifetime
     private int _accountSequence;
     private int _periodSequence;
 
+    public const string Operator = "operator";
+
+    public string Password { get; } = Guid.NewGuid().ToString("N");
+
+    public string SigningKey { get; } = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+
     public HttpClient Client { get; private set; } = null!;
+
+    public HttpClient Clerk { get; private set; } = null!;
+
+    public HttpClient Approver { get; private set; } = null!;
+
+    public HttpClient Controller { get; private set; } = null!;
+
+    public HttpClient Viewer { get; private set; } = null!;
+
+    public HttpClient Admin { get; private set; } = null!;
+
+    public HttpClient Anonymous { get; private set; } = null!;
+
+    public IServiceProvider Services => _factory!.Services;
+
+    public HttpClient NewClient(string? bearer = null)
+    {
+        var client = _factory!.CreateClient();
+        if (bearer is not null)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
+        }
+
+        return client;
+    }
+
+    public async Task CreateUserAsync(string userName, params Roles[] roles)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<UserDirectory>().CreateAsync(userName, Password, roles, CancellationToken.None);
+    }
+
+    public Task<HttpResponseMessage> TokenRawAsync(string userName, string password) =>
+        Anonymous.PostAsJsonAsync("/auth/token", new TokenRequest(userName, password), Json);
+
+    public async Task<HttpClient> SignInAsync(string userName)
+    {
+        var token = await ReadAsync<TokenResponse>(await TokenRawAsync(userName, Password));
+        return NewClient(token.AccessToken);
+    }
 
     public Period NextPeriod()
     {
@@ -39,15 +88,30 @@ public sealed class LedgerApiFixture : IAsyncLifetime
         await _sql.StartAsync();
 
         var connectionString = new SqlConnectionStringBuilder(_sql.GetConnectionString()) { InitialCatalog = "Ledger" }.ConnectionString;
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
-            host.UseSetting("ConnectionStrings:Ledger", connectionString));
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(host => host
+            .UseSetting("ConnectionStrings:Ledger", connectionString)
+            .UseSetting("Jwt:SigningKey", SigningKey));
 
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Database.MigrateAsync();
         }
 
-        Client = _factory.CreateClient();
+        Anonymous = NewClient();
+
+        await CreateUserAsync(Operator, Roles.Clerk, Roles.Approver, Roles.Controller);
+        await CreateUserAsync("clerk", Roles.Clerk);
+        await CreateUserAsync("approver", Roles.Approver);
+        await CreateUserAsync("controller", Roles.Controller);
+        await CreateUserAsync("viewer", Roles.Viewer);
+        await CreateUserAsync("admin", Roles.Admin);
+
+        Client = await SignInAsync(Operator);
+        Clerk = await SignInAsync("clerk");
+        Approver = await SignInAsync("approver");
+        Controller = await SignInAsync("controller");
+        Viewer = await SignInAsync("viewer");
+        Admin = await SignInAsync("admin");
     }
 
     public async Task DisposeAsync()

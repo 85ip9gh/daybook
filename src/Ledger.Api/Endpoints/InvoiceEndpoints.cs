@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Ledger.Api.Auth;
 using Ledger.Api.Data;
 using Ledger.Domain;
 using Ledger.Domain.Receivables;
@@ -10,14 +12,14 @@ internal static class InvoiceEndpoints
     public static IEndpointRouteBuilder MapInvoiceEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/invoices").WithTags("Receivables");
-        group.MapPost("/", DraftAsync);
-        group.MapGet("/{id:guid}", GetAsync);
-        group.MapPost("/{id:guid}/issue", IssueAsync);
-        group.MapPost("/{id:guid}/void", VoidAsync);
+        group.MapPost("/", DraftAsync).RequireAuthorization(Policies.Record);
+        group.MapGet("/{id:guid}", GetAsync).RequireAuthorization(Policies.Read);
+        group.MapPost("/{id:guid}/issue", IssueAsync).RequireAuthorization(Policies.Post);
+        group.MapPost("/{id:guid}/void", VoidAsync).RequireAuthorization(Policies.Post);
         return routes;
     }
 
-    private static async Task<IResult> DraftAsync(DraftInvoiceRequest request, LedgerDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> DraftAsync(DraftInvoiceRequest request, LedgerDbContext db, ClaimsPrincipal user, CancellationToken cancellationToken)
     {
         if (!await db.Customers.AnyAsync(customer => customer.Id == request.CustomerId, cancellationToken))
         {
@@ -41,7 +43,8 @@ internal static class InvoiceEndpoints
             request.ReceivableAccountId,
             [.. request.Lines.Select(line => new InvoiceLineDraft(line.Description, line.Quantity, line.UnitPrice, line.RevenueAccountId))],
             request.Tax is null ? null : new TaxDraft(request.Tax.Rate, request.Tax.AccountId),
-            accounts);
+            accounts,
+            user.Name());
 
         db.Invoices.Add(invoice);
         await db.SaveChangesAsync(cancellationToken);
@@ -64,6 +67,7 @@ internal static class InvoiceEndpoints
         IssueInvoiceRequest request,
         LedgerDbContext db,
         TimeProvider clock,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -79,7 +83,7 @@ internal static class InvoiceEndpoints
         AccountingPeriod.EnsureOpen(request.IssueDate, closedThrough);
 
         var number = await db.NextNumberAsync(NumberSequence.Invoice, cancellationToken);
-        var posting = invoice.Issue(number, request.IssueDate, request.DueDate);
+        var posting = invoice.Issue(number, request.IssueDate, request.DueDate, user.Name());
         var accounts = await AccountsForAsync(db, posting, cancellationToken);
 
         var entry = JournalEntry.Post(
@@ -89,6 +93,7 @@ internal static class InvoiceEndpoints
             posting,
             accounts,
             closedThrough,
+            user.Name(),
             clock.GetUtcNow());
 
         invoice.RecordPosting(entry.Id);
@@ -112,6 +117,7 @@ internal static class InvoiceEndpoints
         VoidInvoiceRequest request,
         LedgerDbContext db,
         TimeProvider clock,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -123,14 +129,14 @@ internal static class InvoiceEndpoints
             return NotFound(id);
         }
 
-        invoice.Void();
+        invoice.Void(user.Name());
 
         var issued = await db.JournalEntries
             .AsNoTracking()
             .Include(entry => entry.Lines)
             .SingleAsync(entry => entry.Id == invoice.JournalEntryId, cancellationToken);
 
-        db.JournalEntries.Add(issued.Reverse(request.VoidDate, closedThrough, clock.GetUtcNow()));
+        db.JournalEntries.Add(issued.Reverse(request.VoidDate, closedThrough, user.Name(), clock.GetUtcNow()));
 
         try
         {
