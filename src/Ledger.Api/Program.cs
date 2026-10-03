@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Ledger.Api;
 using Ledger.Api.Auth;
+using Ledger.Api.Banking;
 using Ledger.Api.Data;
 using Ledger.Api.Endpoints;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -36,6 +37,13 @@ builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>
 builder.Services.AddSingleton<TokenIssuer>();
 builder.Services.AddScoped<UserDirectory>();
 
+builder.Services.AddOptions<ReconciliationOptions>().BindConfiguration(ReconciliationOptions.Section);
+builder.Services.AddScoped<StatementProcessor>();
+if (builder.Configuration.GetValue($"{ReconciliationOptions.Section}:{nameof(ReconciliationOptions.WorkerEnabled)}", true))
+{
+    builder.Services.AddHostedService<StatementWorker>();
+}
+
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -59,6 +67,7 @@ app.MapPeriodEndpoints();
 app.MapCustomerEndpoints();
 app.MapInvoiceEndpoints();
 app.MapPaymentEndpoints();
+app.MapBankEndpoints();
 app.MapReportEndpoints();
 
 if (app.Configuration.GetValue<bool>("Ledger:MigrateOnStartup"))

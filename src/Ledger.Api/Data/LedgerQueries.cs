@@ -1,4 +1,5 @@
 using Ledger.Domain;
+using Ledger.Domain.Banking;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -90,6 +91,26 @@ internal static class LedgerQueries
             .ToListAsync(cancellationToken);
 
         return values.Single();
+    }
+
+    public static async Task<List<LedgerItem>> UnreconciledAsync(
+        this LedgerDbContext db,
+        Guid accountId,
+        DateOnly earliest,
+        DateOnly latest,
+        CancellationToken cancellationToken)
+    {
+        var lines = await (
+            from line in db.JournalLines.AsNoTracking()
+            join entry in db.JournalEntries.AsNoTracking() on line.JournalEntryId equals entry.Id
+            where line.AccountId == accountId
+                && entry.EntryDate >= earliest
+                && entry.EntryDate <= latest
+                && !db.BankLines.Any(bank => bank.MatchedEntryId == line.JournalEntryId && bank.MatchedLineNumber == line.LineNumber)
+            select new { line.JournalEntryId, line.LineNumber, entry.EntryDate, line.Side, line.Amount })
+            .ToListAsync(cancellationToken);
+
+        return [.. lines.Select(line => new LedgerItem(line.JournalEntryId, line.LineNumber, line.EntryDate, BankLine.Signed(line.Side, line.Amount)))];
     }
 
     public static bool IsUniqueViolation(this DbUpdateException exception) =>
