@@ -44,10 +44,11 @@ internal static class PaymentEndpoints
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var closedThrough = await db.HoldPeriodsOpenAsync(cancellationToken);
 
-        if (!await db.Customers.AnyAsync(customer => customer.Id == request.CustomerId, cancellationToken))
-        {
-            throw new LedgerRuleException("customer_not_found", $"Customer {request.CustomerId} does not exist.");
-        }
+        var customerCode = await db.Customers
+            .Where(customer => customer.Id == request.CustomerId)
+            .Select(customer => customer.Code)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new LedgerRuleException("customer_not_found", $"Customer {request.CustomerId} does not exist.");
 
         var invoiceIds = request.Allocations.Select(allocation => allocation.InvoiceId).Distinct().ToList();
         var invoices = await db.Invoices
@@ -66,7 +67,7 @@ internal static class PaymentEndpoints
 
         var entry = JournalEntry.Post(
             request.PaymentDate,
-            $"Payment from customer {request.CustomerId:N}",
+            $"Payment from {customerCode}",
             received.Payment.Currency,
             received.Posting,
             await InvoiceEndpoints.AccountsForAsync(db, received.Posting, cancellationToken),
