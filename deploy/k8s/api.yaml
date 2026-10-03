@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: daybook
+  labels:
+    app.kubernetes.io/name: daybook-api
+    app.kubernetes.io/part-of: daybook
+spec:
+  selector:
+    app.kubernetes.io/name: daybook-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: daybook
+  labels:
+    app.kubernetes.io/name: daybook-api
+    app.kubernetes.io/part-of: daybook
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: daybook-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: daybook-api
+        app.kubernetes.io/part-of: daybook
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: daybook-api:g7
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LEDGER_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: daybook
+                  key: LEDGER_APP_PASSWORD
+            - name: ConnectionStrings__Ledger
+              value: Server=db;Database=Ledger;User Id=daybook_app;Password=$(LEDGER_APP_PASSWORD);TrustServerCertificate=True
+            - name: Jwt__SigningKey
+              valueFrom:
+                secretKeyRef:
+                  name: daybook
+                  key: LEDGER_JWT_KEY
+            - name: Ledger__MigrateOnStartup
+              value: "true"
+            - name: Ledger__FirstAdmin__UserName
+              value: admin
+            - name: Ledger__FirstAdmin__Password
+              valueFrom:
+                secretKeyRef:
+                  name: daybook
+                  key: LEDGER_ADMIN_PASSWORD
+            - name: Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command
+              value: Warning
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

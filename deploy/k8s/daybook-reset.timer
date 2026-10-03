@@ -1,0 +1,9 @@
+[Unit]
+Description=Reset the public Daybook demo every night
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 America/Halifax
+Persistent=false
+
+[Install]
+WantedBy=timers.target

@@ -179,7 +179,22 @@ Compose refuses to start if any of the four is missing, so an empty `LEDGER_BIND
 - **Both app containers run with a read-only root filesystem.**
 - **nginx sends a strict Content Security Policy.** Scripts load only from the site itself, so the production build turns off Angular's critical CSS inlining, which loads the stylesheet through an inline `onload` handler the policy blocks. Hashed assets are cached for a year, `index.html` and `config.json` are not cached.
 - **Uploads stop at 2 MB in nginx**, above the API's own limit of one million characters per statement.
-- **The API connects as `sa`.** A login limited to the one database would be tighter. It is not done yet.
+- **Locally the API connects as `sa`.** The public deployment below does not.
+
+## The public demo
+
+Live at [daybook.pesanth.com](https://daybook.pesanth.com) on a single-node k3s cluster on a home server, behind a Cloudflare Tunnel. The sign-in page has one button per role. The books are made up, anyone can change them, and they are rebuilt every night.
+
+`deploy/k8s/` is the whole deployment:
+
+- **SQL Server Express as a StatefulSet** on a local volume, capped at 2 GB. The image's `sqlservr` binary carries the `NET_BIND_SERVICE` file capability, so the container drops every capability except that one. Dropping it too makes the binary refuse to start.
+- **The API connects as `daybook_app`**, a login that owns the one database and is not a server administrator. `sa` is used only by the reset.
+- **Network policies deny everything by default.** Traefik reaches nginx, nginx reaches the API, the API reaches the database, and the kubelet's probes are allowed from the node. Nothing else talks to anything.
+- **Two rate limits in Traefik, keyed on `Cf-Connecting-Ip`**: 300 requests a minute per visitor across the site, and 10 a minute on `POST /api/auth/token`. Every request arrives from the tunnel on the same host, so keying on the connecting address would give the whole internet one shared budget.
+- **A nightly reset** (`reset-demo.sh`, run by a systemd timer at 04:00 Halifax time) stops the API, drops and recreates the database and the app login with `recreate-database.sql`, starts the API so it migrates the empty database, then runs `tools/seed-demo.mjs` as a Job. It takes about 16 seconds.
+- **There is no registry.** `deploy.sh` builds both images on the node and imports them into k3s's containerd.
+
+Measured idle on the cluster with the demo books loaded: SQL Server 664 MiB, the API 95 MiB, nginx 10 MiB.
 
 ## How the claims were checked
 
@@ -222,4 +237,5 @@ Compose refuses to start if any of the four is missing, so an empty `LEDGER_BIND
 - Every post takes a shared lock on one row. Posts do not block each other, but a close waits for all of them and they wait for it.
 - Append-only is enforced by the API surface, not by database permissions or triggers.
 - A refused request does not consume its idempotency key, so only successful posts are replayed.
-- Not deployed anywhere. The evidence is this repository and its test run.
+- The public demo has no backups. It is rebuilt from the seed every night, so there is nothing in it worth keeping.
+- The demo runs on one machine at home. If that machine or its connection is down, so is the demo.
