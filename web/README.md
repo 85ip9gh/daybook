@@ -1,6 +1,6 @@
-# Ledger web
+# Daybook web
 
-The front end for the Ledger API. Angular 21, standalone components, signals, no UI library.
+The front end for the Daybook API. Angular 21, standalone components, signals, no UI library.
 
 ## Design
 

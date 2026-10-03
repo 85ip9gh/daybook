@@ -5,7 +5,7 @@ import { Auth, READERS, holding, signedIn } from './core/auth';
 export const routes: Routes = [
   {
     path: 'sign-in',
-    title: 'Sign in · Ledger',
+    title: 'Sign in · Daybook',
     loadComponent: () => import('./pages/sign-in').then((module) => module.SignIn),
   },
   {
@@ -27,90 +27,90 @@ export const routes: Routes = [
       },
       {
         path: 'trial-balance',
-        title: 'Trial balance · Ledger',
+        title: 'Trial balance · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () =>
           import('./pages/trial-balance').then((module) => module.TrialBalancePage),
       },
       {
         path: 'accounts',
-        title: 'Accounts · Ledger',
+        title: 'Accounts · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () => import('./pages/accounts').then((module) => module.AccountsPage),
       },
       {
         path: 'accounts/:id',
-        title: 'Account statement · Ledger',
+        title: 'Account statement · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () =>
           import('./pages/account-statement').then((module) => module.AccountStatementPage),
       },
       {
         path: 'journal/new',
-        title: 'New journal entry · Ledger',
+        title: 'New journal entry · Daybook',
         canActivate: [holding('Approver')],
         loadComponent: () =>
           import('./pages/journal-entry').then((module) => module.JournalEntryPage),
       },
       {
         path: 'receivables/aged',
-        title: 'Aged receivables · Ledger',
+        title: 'Aged receivables · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () =>
           import('./pages/aged-receivables').then((module) => module.AgedReceivablesPage),
       },
       {
         path: 'receivables/customers',
-        title: 'Customers · Ledger',
+        title: 'Customers · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () => import('./pages/customers').then((module) => module.CustomersPage),
       },
       {
         path: 'receivables/customers/:id',
-        title: 'Customer · Ledger',
+        title: 'Customer · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () => import('./pages/customer').then((module) => module.CustomerPage),
       },
       {
         path: 'receivables/invoices',
-        title: 'Invoices · Ledger',
+        title: 'Invoices · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () => import('./pages/invoices').then((module) => module.InvoicesPage),
       },
       {
         path: 'receivables/invoices/new',
-        title: 'New invoice · Ledger',
+        title: 'New invoice · Daybook',
         canActivate: [holding('Clerk')],
         loadComponent: () => import('./pages/invoice-new').then((module) => module.InvoiceNewPage),
       },
       {
         path: 'receivables/invoices/:id',
-        title: 'Invoice · Ledger',
+        title: 'Invoice · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () => import('./pages/invoice').then((module) => module.InvoicePage),
       },
       {
         path: 'banking',
-        title: 'Bank reconciliation · Ledger',
+        title: 'Bank reconciliation · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () =>
           import('./pages/reconciliation').then((module) => module.ReconciliationPage),
       },
       {
         path: 'admin/users',
-        title: 'Users · Ledger',
+        title: 'Users · Daybook',
         canActivate: [holding('Admin')],
         loadComponent: () => import('./pages/users').then((module) => module.UsersPage),
       },
       {
         path: 'periods',
-        title: 'Periods · Ledger',
+        title: 'Periods · Daybook',
         canActivate: [holding(...READERS)],
         loadComponent: () => import('./pages/periods').then((module) => module.PeriodsPage),
       },
       {
         path: 'no-access',
-        title: 'No access · Ledger',
+        title: 'No access · Daybook',
         loadComponent: () => import('./pages/no-access').then((module) => module.NoAccess),
       },
     ],
