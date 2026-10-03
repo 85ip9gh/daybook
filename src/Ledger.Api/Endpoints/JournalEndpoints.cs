@@ -7,9 +7,6 @@ namespace Ledger.Api.Endpoints;
 
 internal static class JournalEndpoints
 {
-    public const string IdempotencyKeyHeader = "Idempotency-Key";
-    public const string ReplayHeader = "Idempotent-Replay";
-
     public static IEndpointRouteBuilder MapJournalEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/journal-entries").WithTags("Journal");
@@ -21,18 +18,16 @@ internal static class JournalEndpoints
 
     private static async Task<IResult> PostAsync(
         PostEntryRequest request,
-        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
+        [FromHeader(Name = Idempotency.KeyHeader)] string? idempotencyKey,
         LedgerDbContext db,
         TimeProvider clock,
         HttpContext http,
         CancellationToken cancellationToken)
     {
-        var key = idempotencyKey?.Trim() ?? string.Empty;
-        if (key.Length is 0 or > IdempotencyRecord.MaxKeyLength)
+        var key = Idempotency.ReadKey(idempotencyKey);
+        if (key is null)
         {
-            return Problems.BadRequest(
-                "idempotency_key_required",
-                $"The {IdempotencyKeyHeader} header is required and holds at most {IdempotencyRecord.MaxKeyLength} characters.");
+            return Idempotency.KeyRequired();
         }
 
         var hash = RequestHash.Of(request);
@@ -91,7 +86,7 @@ internal static class JournalEndpoints
         HttpContext http,
         CancellationToken cancellationToken)
     {
-        var record = await db.IdempotencyRecords.AsNoTracking().SingleOrDefaultAsync(record => record.Key == key, cancellationToken);
+        var record = await Idempotency.FindAsync(db, key, cancellationToken);
         if (record is null)
         {
             return null;
@@ -99,7 +94,7 @@ internal static class JournalEndpoints
 
         if (record.RequestHash != hash)
         {
-            return Problems.Conflict("idempotency_key_reused", $"{IdempotencyKeyHeader} {key} was already used with a different request.");
+            return Idempotency.KeyReused(key);
         }
 
         var entry = await db.JournalEntries
@@ -107,7 +102,7 @@ internal static class JournalEndpoints
             .Include(entry => entry.Lines)
             .SingleAsync(entry => entry.Id == record.JournalEntryId, cancellationToken);
 
-        http.Response.Headers[ReplayHeader] = "true";
+        http.Response.Headers[Idempotency.ReplayHeader] = "true";
         return Results.Ok(entry.ToResponse());
     }
 

@@ -24,6 +24,28 @@ internal static class RequestHash
                 .Append(line.Amount.ToString(AmountFormat, CultureInfo.InvariantCulture)).Append('\n');
         }
 
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
+        return Hash(canonical);
     }
+
+    public static string Of(ReceivePaymentRequest request)
+    {
+        var canonical = new StringBuilder("payment\n")
+            .Append(request.CustomerId.ToString("N")).Append('\n')
+            .Append(request.PaymentDate.ToString("O", CultureInfo.InvariantCulture)).Append('\n')
+            .Append(request.Amount.ToString(AmountFormat, CultureInfo.InvariantCulture)).Append('\n')
+            .Append(request.Currency.Trim().ToUpperInvariant()).Append('\n')
+            .Append(request.DepositAccountId.ToString("N")).Append('\n');
+
+        foreach (var allocation in request.Allocations)
+        {
+            canonical
+                .Append(allocation.InvoiceId.ToString("N")).Append('|')
+                .Append(allocation.Amount.ToString(AmountFormat, CultureInfo.InvariantCulture)).Append('\n');
+        }
+
+        return Hash(canonical);
+    }
+
+    private static string Hash(StringBuilder canonical) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
 }

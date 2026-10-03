@@ -1,4 +1,5 @@
 using Ledger.Domain;
+using Ledger.Domain.Receivables;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ledger.Api.Data;
@@ -19,8 +20,20 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
 
     public DbSet<PeriodBalance> PeriodBalances => Set<PeriodBalance>();
 
+    public DbSet<Customer> Customers => Set<Customer>();
+
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+
+    public DbSet<Payment> Payments => Set<Payment>();
+
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+
+    public DbSet<NumberSequence> Sequences => Set<NumberSequence>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ReceivablesModel.Configure(modelBuilder);
+
         modelBuilder.Entity<LedgerState>(state =>
         {
             state.HasKey(s => s.Id);
