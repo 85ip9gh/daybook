@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.git/
+.github/
+.dev/
+.vs/
+web/
+tests/
+tools/
+docs/
+deploy/
+**/*.user
+**/appsettings.Development.json

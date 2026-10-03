@@ -68,6 +68,7 @@ tools/seed-demo.mjs fills an empty database with a small set of books and demo u
 docs/tuning.md      what was measured, on what, and what it does not show
 docs/sample-statement.csv  a bank statement that fits the demo data, to try the import
 web/                Angular front end, 69 tests, described in web/README.md
+deploy/compose.yaml SQL Server Express, the API and nginx, one published port
 ```
 
 The domain project references nothing outside the base class library. Every bookkeeping rule lives there and is tested without a database.
@@ -152,6 +153,33 @@ dotnet user-secrets set "Jwt:SigningKey" "$LEDGER_JWT_KEY" --project src/Ledger.
 ```
 
 The front end is in `web/` and its README covers running it against this API.
+
+## Running the whole stack
+
+`deploy/compose.yaml` runs three containers: SQL Server 2022 Express, the API, and nginx serving the built front end and proxying `/api/` to the API. Only nginx publishes a port. The database and the API are reachable only on the compose network.
+
+Put the four values in `deploy/.env`, which git ignores:
+
+```
+MSSQL_SA_PASSWORD=...
+LEDGER_JWT_KEY=...
+LEDGER_ADMIN_PASSWORD=...
+LEDGER_BIND=127.0.0.1:8080
+```
+
+```bash
+docker compose --file deploy/compose.yaml up -d --build
+```
+
+Compose refuses to start if any of the four is missing, so an empty `LEDGER_BIND` cannot publish on every interface. The API applies migrations and creates the first admin on start. `tools/seed-demo.mjs` with `LEDGER_API=http://127.0.0.1:8080/api` fills it with demo books.
+
+- **Express, not Developer.** Developer is licensed for development and test only. Express is free for production use and its limits (1,410 MB buffer pool, 10 GB per database) are far above what this needs.
+- **Memory.** SQL Server needs 2 GB to start on Linux, so its container is capped at exactly that, with `MSSQL_MEMORY_LIMIT_MB=1536` inside it. Measured idle after a restart with the demo books loaded: SQL Server 580 MiB, the API 77 MiB, nginx 10 MiB.
+- **The API image is chiseled**: no shell, no package manager, a non-root user. It is the `-extra` variant because SqlClient needs ICU, which the plain chiseled image leaves out.
+- **Both app containers run with a read-only root filesystem.**
+- **nginx sends a strict Content Security Policy.** Scripts load only from the site itself, so the production build turns off Angular's critical CSS inlining, which loads the stylesheet through an inline `onload` handler the policy blocks. Hashed assets are cached for a year, `index.html` and `config.json` are not cached.
+- **Uploads stop at 2 MB in nginx**, above the API's own limit of one million characters per statement.
+- **The API connects as `sa`.** A login limited to the one database would be tighter. It is not done yet.
 
 ## How the claims were checked
 
