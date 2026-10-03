@@ -1,5 +1,6 @@
 using Ledger.Api.Auth;
 using Ledger.Domain;
+using Ledger.Domain.Banking;
 using Ledger.Domain.Receivables;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,9 +34,14 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options) :
 
     public DbSet<AppUser> Users => Set<AppUser>();
 
+    public DbSet<BankStatement> BankStatements => Set<BankStatement>();
+
+    public DbSet<BankLine> BankLines => Set<BankLine>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ReceivablesModel.Configure(modelBuilder);
+        BankingModel.Configure(modelBuilder);
 
         modelBuilder.Entity<AppUser>(user =>
         {

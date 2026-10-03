@@ -90,7 +90,8 @@ public sealed class LedgerApiFixture : IAsyncLifetime
         var connectionString = new SqlConnectionStringBuilder(_sql.GetConnectionString()) { InitialCatalog = "Ledger" }.ConnectionString;
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(host => host
             .UseSetting("ConnectionStrings:Ledger", connectionString)
-            .UseSetting("Jwt:SigningKey", SigningKey));
+            .UseSetting("Jwt:SigningKey", SigningKey)
+            .UseSetting("Reconciliation:PollInterval", "00:00:00.100"));
 
         await using (var scope = _factory.Services.CreateAsyncScope())
         {

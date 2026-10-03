@@ -36,13 +36,27 @@ Nobody types debits and credits for a sale. An invoice or a payment is the busin
 - **Holding two roles is not enough to approve your own work.** Whoever drafted an invoice cannot issue it. That rule lives in the domain, not in a route policy, and answers `403 segregation_of_duties`.
 - **Every record names its author.** Journal entries, invoices, payments and period closes store the user who made them, and the domain refuses to post an entry attributed to nobody.
 
+### Bank reconciliation
+
+A bank statement is uploaded as CSV, accepted at once with `202`, and parsed and matched by a background worker.
+
+- **The upload only stores the file.** Parsing and matching happen in a `BackgroundService`, so a large statement never holds a request open. The client polls the statement for its status.
+- **Statements are claimed from a queue table.** A worker takes the next one with a single `UPDATE TOP (1) ... OUTPUT` using `READPAST` and `UPDLOCK`, so two workers never claim the same statement and neither waits behind the other.
+- **An abandoned statement is picked up again.** A claim is a lease. If a worker dies mid-statement, the claim goes stale and another worker takes it.
+- **Re-importing is safe at two levels.** The same file for the same account returns the statement already stored. A different file that overlaps an earlier one adds only the lines whose bank reference has not been seen, enforced by a unique index on account and reference.
+- **A bad file fails whole.** Every bad line is reported with its line number and no line is stored. The CSV reader is written here and handles quoted fields, escaped quotes and line breaks inside quotes.
+- **Matching is exact and deterministic.** A bank line matches a ledger line on the same account with the same signed amount within three days. Within each amount, both sides are walked in date order, which finds the most pairs a date window allows where taking the nearest candidate first can strand one.
+- **A ledger line reconciles one bank line.** A filtered unique index decides it. A worker that loses that race releases its statement and tries again, up to five times.
+- **What the matcher cannot place waits for a person.** An approver matches or unmatches by hand. Amounts must be equal, and bank lines carry a `rowversion` token.
+- **The report shows both sides.** Bank lines not in the books, ledger lines not at the bank, and the two totals that must agree once they are removed.
+
 ## Layout
 
 ```
 src/Ledger.Domain   entities and rules, no dependencies
 src/Ledger.Api      endpoints, EF Core mapping, migrations
-tests/Ledger.Domain.Tests   80 tests, no database, no container
-tests/Ledger.Api.Tests      88 tests against SQL Server 2022 in a container
+tests/Ledger.Domain.Tests   97 tests, no database, no container
+tests/Ledger.Api.Tests      99 tests against SQL Server 2022 in a container
 ```
 
 The domain project references nothing outside the base class library. Every bookkeeping rule lives there and is tested without a database.
@@ -79,6 +93,11 @@ Every `GET` below needs Viewer, Clerk, Approver or Controller unless the table s
 | POST | `/payments` | Clerk | Receive a payment and allocate it, idempotent by key |
 | GET | `/payments/{id}` | read | Read a payment |
 | GET | `/openapi/v1.json` | public | OpenAPI document |
+| POST | `/bank-accounts/{accountId}/statements` | Clerk | Upload a CSV statement, answered `202` |
+| GET | `/bank-statements/{id}` | read | Status, counts and any error |
+| GET | `/bank-accounts/{accountId}/reconciliation?asOf=` | read | Both unreconciled sides and their totals |
+| POST | `/bank-lines/{id}/match` | Approver | Match a bank line to a journal line by hand |
+| POST | `/bank-lines/{id}/unmatch` | Approver | Undo a match |
 | GET | `/healthz` | public | Liveness |
 
 Rule violations return RFC 9457 problem details with a stable `code` field such as `entry_unbalanced` or `currency_mismatch`.
@@ -118,12 +137,21 @@ ConnectionStrings__Ledger="Server=localhost,1433;Database=Ledger;User Id=sa;Pass
 - One test enumerates every mapped route and calls it with no token. Anything other than the three public routes that does not answer `401` fails it. With the fallback policy removed and one route left without a policy, the test failed and named that route.
 - Tokens that are expired, for another audience, from another issuer, signed with another key, unsigned, or garbage are each refused, and a token built the same way with nothing wrong is accepted. With lifetime validation turned off only the expired case failed, and with audience validation turned off only the audience case failed.
 - A table of 22 role and route pairs checks that each role reaches its own routes and gets `403` on the others.
+- Four statements of five identical lines are processed in parallel against five identical ledger lines. Exactly five bank lines end up matched, each to a different ledger line, and all four statements finish. With the race handling disabled the same test failed three runs of three on the unique index, so the race is real and the retry is what absorbs it.
+- A statement left in `Processing` with an hour-old claim is finished by the worker. With stale claims no longer reclaimed, that test timed out.
+- An overlapping statement adds only its new line. With the duplicate check removed, it failed instead.
+- Twelve statements drained by six parallel processors plus the hosted worker each show exactly one attempt.
 - One test bypasses the API and inserts a negative amount with raw SQL, to show the check constraint refuses it independently of the application.
 - One domain test posts 500 random entries with random reversals from three fixed seeds and asserts the trial balance still balances.
 - CI fails if the EF Core model has changes that no migration covers.
 
 ## Limitations
 
+- Matching is one bank line to one ledger line with equal amounts. A deposit that covers three ledger lines, or a ledger line settled by two bank lines, has to be handled outside it.
+- An entry and its reversal on a bank account both stay on the unreconciled list, although they net to zero.
+- The reconciliation totals agree only for a date on or after both sides of every match.
+- The statement format is one fixed CSV layout. No bank's real export format, OFX or MT940 is supported.
+- The worker polls. There is no notification when a statement arrives, so the delay is up to one poll interval.
 - The API is its own user store and token issuer with one symmetric key. There is no external identity provider, no refresh token, no key rotation, no lockout and no rate limit on `/auth/token`.
 - A token stays valid until it expires. Deactivating a user or changing their roles takes effect at their next sign-in, up to 30 minutes later.
 - Segregation of duties covers issuing an invoice only. Nothing stops an approver reversing their own journal entry.

@@ -198,6 +198,128 @@ namespace Ledger.Api.Data.Migrations
                     b.ToTable("Accounts");
                 });
 
+            modelBuilder.Entity("Ledger.Domain.Banking.BankLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("MatchedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("MatchedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("MatchedEntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("MatchedLineNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("StatementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StatementId");
+
+                    b.HasIndex("AccountId", "Reference")
+                        .IsUnique();
+
+                    b.HasIndex("MatchedEntryId", "MatchedLineNumber")
+                        .IsUnique()
+                        .HasFilter("[MatchedEntryId] IS NOT NULL AND [MatchedLineNumber] IS NOT NULL");
+
+                    b.ToTable("BankLines");
+                });
+
+            modelBuilder.Entity("Ledger.Domain.Banking.BankStatement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("ImportedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ImportedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("LineCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MatchedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NewLineCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("AccountId", "ContentHash")
+                        .IsUnique();
+
+                    b.ToTable("BankStatements");
+                });
+
             modelBuilder.Entity("Ledger.Domain.JournalEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -511,6 +633,35 @@ namespace Ledger.Api.Data.Migrations
                     b.HasOne("Ledger.Api.Data.PeriodClose", null)
                         .WithMany()
                         .HasForeignKey("PeriodEnd")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Ledger.Domain.Banking.BankLine", b =>
+                {
+                    b.HasOne("Ledger.Domain.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Ledger.Domain.Banking.BankStatement", null)
+                        .WithMany()
+                        .HasForeignKey("StatementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Ledger.Domain.JournalLine", null)
+                        .WithMany()
+                        .HasForeignKey("MatchedEntryId", "MatchedLineNumber")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Ledger.Domain.Banking.BankStatement", b =>
+                {
+                    b.HasOne("Ledger.Domain.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
