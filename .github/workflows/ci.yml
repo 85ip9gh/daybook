@@ -39,3 +39,17 @@ jobs:
       - run: npm run format:check
       - run: npm run build
       - run: npm test
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --file src/Ledger.Api/Dockerfile --tag ledger-api:ci .
+      - run: docker build --tag ledger-web:ci web
+      - run: docker run --rm --add-host api:127.0.0.1 ledger-web:ci nginx -t
+      - run: docker compose --file deploy/compose.yaml config --quiet
+        env:
+          MSSQL_SA_PASSWORD: ci
+          LEDGER_JWT_KEY: ci
+          LEDGER_ADMIN_PASSWORD: ci
+          LEDGER_BIND: 127.0.0.1:8080
