@@ -5,6 +5,7 @@ const base = (process.env.LEDGER_API ?? 'http://localhost:5081').replace(/\/+$/,
 const adminUser = process.env.LEDGER_ADMIN_USER ?? 'admin';
 const adminPassword = process.env.LEDGER_ADMIN_PASSWORD;
 const credentialsPath = process.env.LEDGER_DEMO_USERS ?? '.dev/demo-users.json';
+const demoPassword = process.env.LEDGER_DEMO_PASSWORD;
 
 if (!adminPassword) {
   console.error('Set LEDGER_ADMIN_PASSWORD to the first admin password.');
@@ -46,7 +47,7 @@ const users = {
 const credentials = {};
 const tokens = {};
 for (const [userName, roles] of Object.entries(users)) {
-  const password = randomBytes(15).toString('base64url');
+  const password = demoPassword ?? randomBytes(15).toString('base64url');
   await call(admin, 'POST', '/users', { userName, password, roles });
   credentials[userName] = { password, roles };
   tokens[userName] = await signIn(userName, password);

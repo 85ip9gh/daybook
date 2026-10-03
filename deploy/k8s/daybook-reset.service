@@ -1,0 +1,9 @@
+[Unit]
+Description=Reset the public Daybook demo to its seeded books
+After=k3s.service
+Requires=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/pesanth/daybook/src/deploy/k8s/reset-demo.sh
+TimeoutStartSec=15min

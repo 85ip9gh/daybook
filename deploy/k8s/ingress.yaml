@@ -1,0 +1,73 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: ratelimit
+  namespace: daybook
+spec:
+  rateLimit:
+    average: 300
+    period: 1m
+    burst: 100
+    sourceCriterion:
+      requestHeaderName: Cf-Connecting-Ip
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: signin-ratelimit
+  namespace: daybook
+spec:
+  rateLimit:
+    average: 10
+    period: 1m
+    burst: 5
+    sourceCriterion:
+      requestHeaderName: Cf-Connecting-Ip
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: daybook
+  namespace: daybook
+  labels:
+    app.kubernetes.io/part-of: daybook
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: daybook-ratelimit@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: daybook.pesanth.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: daybook-signin
+  namespace: daybook
+  labels:
+    app.kubernetes.io/part-of: daybook
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: daybook-signin-ratelimit@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: daybook.pesanth.com
+      http:
+        paths:
+          - path: /api/auth/token
+            pathType: Exact
+            backend:
+              service:
+                name: web
+                port:
+                  name: http
