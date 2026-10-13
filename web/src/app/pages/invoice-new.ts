@@ -15,7 +15,7 @@ import { DraftInvoiceLine, emptyInvoiceLine, summariseInvoice } from './invoice.
         <div>
           <p><a routerLink="/receivables/invoices">Invoices</a></p>
           <h1>New invoice</h1>
-          <p>A draft posts nothing. Someone else has to issue it.</p>
+          <p>Another user must issue it.</p>
         </div>
       </header>
 

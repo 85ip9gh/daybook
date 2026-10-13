@@ -15,7 +15,7 @@ type Bucket = 'current' | 'days1To30' | 'days31To60' | 'days61To90' | 'over90';
       <header class="page-head">
         <div>
           <h1>Aged receivables</h1>
-          <p>What each customer owed on the date chosen, by how long it had been due.</p>
+          <p>Amounts owed by days overdue.</p>
         </div>
         <div class="controls">
           <label class="field">

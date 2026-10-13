@@ -17,7 +17,7 @@ import { MoneyPipe } from '../core/money';
       <header class="page-head">
         <div>
           <h1>Bank reconciliation</h1>
-          <p>What the bank shows that the books do not, and the other way round.</p>
+          <p>Match bank lines to the books.</p>
         </div>
         <div class="controls">
           <label class="field">

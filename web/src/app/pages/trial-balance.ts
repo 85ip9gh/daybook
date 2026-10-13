@@ -14,7 +14,7 @@ import { MoneyPipe } from '../core/money';
       <header class="page-head">
         <div>
           <h1>Trial balance</h1>
-          <p>Every account with activity, as of the date chosen.</p>
+          <p>Account balances as of a date.</p>
         </div>
         <div class="controls">
           <label class="field">

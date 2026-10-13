@@ -14,7 +14,7 @@ import { MoneyPipe } from '../core/money';
       <header class="page-head">
         <div>
           <h1>Invoices</h1>
-          <p>Drafts first, then issued invoices from the newest number down.</p>
+          <p>Drafts first, then newest issued.</p>
         </div>
         <div class="controls">
           <label class="field">

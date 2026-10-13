@@ -16,10 +16,10 @@ import { load, loaded } from '../core/loaded';
           <h1>Periods</h1>
           <p>
             @if (periods().value?.closedThrough; as closed) {
-              The books are closed through <span class="date">{{ closed }}</span
-              >. Nothing can be dated on or before it.
+              Closed through <span class="date">{{ closed }}</span
+              >.
             } @else {
-              No period has been closed. Any date can still be posted to.
+              No periods closed.
             }
           </p>
         </div>
@@ -53,10 +53,7 @@ import { load, loaded } from '../core/loaded';
               }
             </div>
             @if (confirming()) {
-              <p class="note">
-                Closing cannot be undone. Every earlier month is closed with it, and each account's
-                totals are frozen as of the last day.
-              </p>
+              <p class="note">This cannot be undone. Earlier months close with it.</p>
             }
             @if (error()) {
               <p class="note error" role="alert">{{ error() }}</p>
