@@ -129,7 +129,7 @@ import { MoneyPipe } from '../core/money';
                   Issue invoice
                 </button>
               </div>
-              <p class="muted">Issuing numbers the invoice and posts it to the ledger.</p>
+              <p class="muted">Numbers the invoice and posts it.</p>
             </form>
           }
 
@@ -157,9 +157,7 @@ import { MoneyPipe } from '../core/money';
                   </button>
                 }
               </div>
-              <p class="muted">
-                Voiding posts a reversal. The original entry stays in the journal.
-              </p>
+              <p class="muted">Posts a reversing entry.</p>
             </form>
           }
 

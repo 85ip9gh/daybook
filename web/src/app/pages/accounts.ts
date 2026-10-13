@@ -13,7 +13,7 @@ import { load, loaded } from '../core/loaded';
       <header class="page-head">
         <div>
           <h1>Accounts</h1>
-          <p>The chart of accounts. Open one to see its statement.</p>
+          <p>Chart of accounts.</p>
         </div>
       </header>
 

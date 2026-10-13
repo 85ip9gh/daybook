@@ -14,7 +14,7 @@ import { DraftLine, emptyLine, summarise } from './journal-entry.model';
       <header class="page-head">
         <div>
           <h1>New journal entry</h1>
-          <p>Debits must equal credits before the entry can be posted.</p>
+          <p>Debits must equal credits.</p>
         </div>
       </header>
 

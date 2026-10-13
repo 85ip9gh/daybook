@@ -12,7 +12,7 @@ import { AppConfig } from '../core/config';
     <div class="frame">
       <aside class="band">
         <span class="brand">Daybook</span>
-        <p>Double-entry books, receivables and bank reconciliation.</p>
+        <p>General ledger, receivables and bank reconciliation.</p>
       </aside>
 
       <main>
@@ -54,10 +54,7 @@ import { AppConfig } from '../core/config';
         @if (demo; as demo) {
           <section class="demo" aria-labelledby="demo-heading">
             <h2 id="demo-heading">Try the demo</h2>
-            <p>
-              Made-up books for a small consultancy, open to anyone and reset every night. Each role
-              sees different screens, and whoever drafts an invoice cannot issue it.
-            </p>
+            <p>Sample books, reset nightly. Each role sees different screens.</p>
             <ul>
               @for (account of demo.accounts; track account.userName) {
                 <li>

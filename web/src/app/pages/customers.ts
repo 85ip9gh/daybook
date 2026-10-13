@@ -13,7 +13,7 @@ import { load, loaded } from '../core/loaded';
       <header class="page-head">
         <div>
           <h1>Customers</h1>
-          <p>Open a customer to see what they owe and to record a payment.</p>
+          <p>Balances owed and payments.</p>
         </div>
       </header>
 

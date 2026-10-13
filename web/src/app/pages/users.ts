@@ -14,7 +14,7 @@ const allRoles: Role[] = ['Viewer', 'Clerk', 'Approver', 'Controller', 'Admin'];
       <header class="page-head">
         <div>
           <h1>Users</h1>
-          <p>A change of role takes effect the next time the user signs in.</p>
+          <p>Role changes apply at next sign-in.</p>
         </div>
       </header>
 
