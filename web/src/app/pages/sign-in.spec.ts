@@ -25,6 +25,34 @@ describe('SignIn', () => {
     ],
   };
 
+  function markedRoles(page: HTMLElement, task: string): string[] {
+    const roles = [...page.querySelectorAll('.roles thead th')].map((cell) =>
+      cell.textContent?.trim(),
+    );
+    const row = [...page.querySelectorAll<HTMLTableRowElement>('.roles tbody tr')].find(
+      (candidate) => candidate.cells[0].textContent?.trim() === task,
+    );
+    return [...(row?.cells ?? [])]
+      .filter((cell) => cell.textContent?.includes('Yes'))
+      .map((cell) => roles[cell.cellIndex] ?? '');
+  }
+
+  it('shows which demo role can do each task', async () => {
+    const { page } = await render({ demo });
+
+    expect(markedRoles(page, 'See the books and every report')).toEqual([
+      'Viewer',
+      'Clerk',
+      'Approver',
+      'Controller',
+    ]);
+    expect(markedRoles(page, 'Write an invoice as a draft')).toEqual(['Clerk']);
+    expect(markedRoles(page, 'Make a draft invoice final, or cancel an unpaid one')).toEqual([
+      'Approver',
+    ]);
+    expect(markedRoles(page, 'Close a month so nothing in it can change')).toEqual(['Controller']);
+  });
+
   it('shows no demo section unless the config names demo accounts', async () => {
     const { page } = await render({});
 

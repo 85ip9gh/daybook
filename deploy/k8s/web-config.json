@@ -3,10 +3,10 @@
   "demo": {
     "password": "__DEMO_PASSWORD__",
     "accounts": [
-      { "userName": "demo-viewer", "role": "Viewer", "summary": "Reads the books and every report" },
-      { "userName": "demo-clerk", "role": "Clerk", "summary": "Registers customers, drafts invoices, receives payments, imports statements" },
-      { "userName": "demo-approver", "role": "Approver", "summary": "Issues and voids invoices, posts journal entries, matches bank lines" },
-      { "userName": "demo-controller", "role": "Controller", "summary": "Opens accounts and closes periods" }
+      { "userName": "demo-viewer", "role": "Viewer", "summary": "Looks at everything and changes nothing" },
+      { "userName": "demo-clerk", "role": "Clerk", "summary": "Does the day-to-day entry: customers, draft invoices, payments and bank statements" },
+      { "userName": "demo-approver", "role": "Approver", "summary": "Signs off: makes invoices final and makes entries in the books" },
+      { "userName": "demo-controller", "role": "Controller", "summary": "Sets up the accounts and locks each month once it is done" }
     ]
   }
 }
