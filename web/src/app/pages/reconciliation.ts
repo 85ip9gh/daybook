@@ -3,7 +3,7 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { switchMap, take, takeWhile, timer } from 'rxjs';
-import { Account, Api, BankStatement, Reconciliation, toProblem } from '../core/api';
+import { Account, Api, BankStatement, MatchedLine, Reconciliation, toProblem } from '../core/api';
 import { Auth } from '../core/auth';
 import { today } from '../core/dates';
 import { load, loaded } from '../core/loaded';
@@ -49,7 +49,7 @@ import { MoneyPipe } from '../core/money';
                 <dd>{{ found.bookBalance | money }}</dd>
               </div>
               <div>
-                <dt>Imported from the bank</dt>
+                <dt>Total of uploaded bank lines</dt>
                 <dd>{{ found.bankTotal | money }}</dd>
               </div>
               <div>
@@ -177,6 +177,61 @@ import { MoneyPipe } from '../core/money';
                 }
               </div>
             }
+
+            <div>
+              <div class="section-head">
+                <h2>Matched</h2>
+              </div>
+              @if (found.matchedBankLines.length === 0) {
+                <p class="note">Nothing is matched yet.</p>
+              } @else {
+                <div class="scroll">
+                  <table class="ledger">
+                    <thead>
+                      <tr>
+                        <th scope="col">Bank date</th>
+                        <th scope="col">Reference</th>
+                        <th scope="col">Books date</th>
+                        <th scope="col" class="figure">Amount</th>
+                        <th scope="col">Matched by</th>
+                        @if (canMatch) {
+                          <th scope="col"><span class="visually-hidden">Undo</span></th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (line of found.matchedBankLines; track line.id) {
+                        <tr>
+                          <td class="code">{{ line.date }}</td>
+                          <td>
+                            {{ line.reference }}
+                            <span class="muted">{{ line.description }}</span>
+                          </td>
+                          <td class="code">{{ line.entryDate }}</td>
+                          <td class="figure">{{ line.amount | money }}</td>
+                          <td class="muted">
+                            {{ line.matchedBy === autoMatch ? 'Automatic' : line.matchedBy }}
+                          </td>
+                          @if (canMatch) {
+                            <td>
+                              <button
+                                type="button"
+                                class="button quiet"
+                                [attr.aria-label]="'Undo match for ' + line.reference"
+                                [disabled]="busy()"
+                                (click)="unmatch(line)"
+                              >
+                                Undo match
+                              </button>
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
           } @else {
             <p class="muted">Loading</p>
           }
@@ -291,6 +346,7 @@ export class ReconciliationPage {
   private readonly auth = inject(Auth);
   private readonly accounts = loaded<Account[]>();
 
+  protected readonly autoMatch = 'auto-match';
   protected readonly canMatch = this.auth.has('Approver');
   protected readonly canUpload = this.auth.has('Clerk');
   protected readonly accountId = signal('');
@@ -306,7 +362,7 @@ export class ReconciliationPage {
   protected readonly error = signal('');
 
   protected readonly banks = computed(() =>
-    (this.accounts().value ?? []).filter((account) => account.type === 'Asset' && account.isActive),
+    (this.accounts().value ?? []).filter((account) => account.isBank && account.isActive),
   );
 
   private readonly chosen = computed(() => {
@@ -361,6 +417,21 @@ export class ReconciliationPage {
 
     this.busy.set(true);
     this.api.matchBankLine(bank.id, ledger.journalEntryId, ledger.lineNumber).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.refresh();
+      },
+      error: (error: unknown) => {
+        this.busy.set(false);
+        this.error.set(toProblem(error).detail);
+      },
+    });
+  }
+
+  protected unmatch(line: MatchedLine): void {
+    this.busy.set(true);
+    this.error.set('');
+    this.api.unmatchBankLine(line.id).subscribe({
       next: () => {
         this.busy.set(false);
         this.refresh();

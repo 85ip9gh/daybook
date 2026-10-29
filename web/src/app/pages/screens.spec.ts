@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { Account, Api, Invoice, Reconciliation, User } from '../core/api';
 import { Auth, Role } from '../core/auth';
+import { AccountsPage } from './accounts';
 import { CustomerPage } from './customer';
 import { ReconciliationPage } from './reconciliation';
 import { UsersPage } from './users';
@@ -16,6 +17,17 @@ const bank: Account = {
   type: 'Asset',
   currency: 'CAD',
   isActive: true,
+  isBank: true,
+};
+
+const receivable: Account = {
+  id: 'receivable',
+  code: '1200',
+  name: 'Accounts receivable',
+  type: 'Asset',
+  currency: 'CAD',
+  isActive: true,
+  isBank: false,
 };
 
 function auth(name: string, ...roles: Role[]) {
@@ -120,18 +132,34 @@ describe('ReconciliationPage', () => {
       { journalEntryId: 'e1', lineNumber: 2, entryDate: '2026-09-25', amount: -12.5 },
     ],
     unreconciledLedgerTotal: -12.5,
+    matchedBankLines: [
+      {
+        id: 'b9',
+        date: '2026-09-30',
+        reference: 'BK-9',
+        description: 'Rent',
+        amount: -2300,
+        entryDate: '2026-09-29',
+        matchedBy: 'auto-match',
+      },
+    ],
   };
 
-  async function render(roles: Role[], matchBankLine = vi.fn().mockReturnValue(of(undefined))) {
+  async function render(
+    roles: Role[],
+    matchBankLine = vi.fn().mockReturnValue(of(undefined)),
+    unmatchBankLine = vi.fn().mockReturnValue(of(undefined)),
+  ) {
     TestBed.configureTestingModule({
       providers: [
         {
           provide: Api,
           useValue: {
-            accounts: () => of([bank]),
+            accounts: () => of([bank, receivable]),
             reconciliation: () => of(report),
             statements: () => of([]),
             matchBankLine,
+            unmatchBankLine,
           },
         },
         auth('amira', ...roles),
@@ -140,8 +168,32 @@ describe('ReconciliationPage', () => {
     const fixture = TestBed.createComponent(ReconciliationPage);
     const page = await settle(fixture);
     await type(fixture, page.querySelector('select')!, 'bank');
-    return { fixture, page, matchBankLine };
+    return { fixture, page, matchBankLine, unmatchBankLine };
   }
+
+  const undoButton = (page: HTMLElement) =>
+    [...page.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Undo match'),
+    );
+
+  it('offers only bank accounts to reconcile', async () => {
+    const { page } = await render(['Viewer']);
+    const options = [...page.querySelectorAll('select option')].map((option) => option.textContent);
+
+    expect(options).toContain('1000 Operating account');
+    expect(options).not.toContain('1200 Accounts receivable');
+  });
+
+  it('lets an approver undo a match', async () => {
+    const { fixture, page, unmatchBankLine } = await render(['Approver']);
+
+    expect(page.textContent).toContain('BK-9');
+    expect(page.textContent).toContain('Automatic');
+
+    undoButton(page)!.click();
+    await fixture.whenStable();
+    expect(unmatchBankLine).toHaveBeenCalledWith('b9');
+  });
 
   const matchButton = (page: HTMLElement) =>
     [...page.querySelectorAll('button')].find((button) => button.textContent?.includes('Match'));
@@ -171,7 +223,38 @@ describe('ReconciliationPage', () => {
     expect(page.querySelectorAll('input[type=radio]')).toHaveLength(0);
     expect(page.querySelector('input[type=file]')).toBeNull();
     expect(matchButton(page)).toBeUndefined();
+    expect(undoButton(page)).toBeUndefined();
     expect(page.textContent).toContain('BK-2');
+    expect(page.textContent).toContain('BK-9');
+  });
+});
+
+describe('AccountsPage', () => {
+  it('opens a bank account only as an asset', async () => {
+    const openAccount = vi.fn().mockReturnValue(of(bank));
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: Api, useValue: { accounts: () => of([bank, receivable]), openAccount } },
+        auth('amira', 'Controller'),
+      ],
+    });
+    const fixture = TestBed.createComponent(AccountsPage);
+    const page = await settle(fixture);
+
+    expect(page.textContent).toContain('Asset, bank');
+    await type(fixture, page.querySelector('input[name=code]')!, '1020');
+    await type(fixture, page.querySelector('input[name=name]')!, 'Payroll account');
+    page.querySelector<HTMLInputElement>('input[name=isBank]')!.click();
+    await fixture.whenStable();
+    page.querySelector('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(openAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ code: '1020', type: 'Asset', isBank: true }),
+    );
+
+    await type(fixture, page.querySelector('select[name=type]')!, 'Revenue');
+    expect(page.querySelector('input[name=isBank]')).toBeNull();
   });
 });
 
@@ -207,7 +290,7 @@ describe('CustomerPage', () => {
           provide: Api,
           useValue: {
             customers: () => of([{ id: 'c1', code: 'BNA', name: 'Bluenose Analytics' }]),
-            accounts: () => of([bank]),
+            accounts: () => of([bank, receivable]),
             receivables: () => of({ customerId: 'c1', outstanding: 5472, invoices: [invoice] }),
             receivePayment,
           },
@@ -223,6 +306,7 @@ describe('CustomerPage', () => {
       await fixture.whenStable();
     };
 
+    expect(page.querySelector('select[name=deposit]')!.textContent).not.toContain('1200');
     await type(fixture, page.querySelector('input.figure')!, '6000');
     expect(page.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
     expect(page.textContent).toContain('more than its invoice has outstanding');

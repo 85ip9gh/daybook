@@ -52,9 +52,9 @@ public sealed class BankStatement
 
     public static BankStatement Import(Account account, string? content, string? importedBy, DateTimeOffset importedAt)
     {
-        if (account.Type != AccountType.Asset || !account.IsActive)
+        if (!account.IsBank || !account.IsActive)
         {
-            throw new LedgerRuleException("bank_account_invalid", $"Account {account.Code} is not an active asset account, so it cannot take a bank statement.");
+            throw new LedgerRuleException("bank_account_invalid", $"Account {account.Code} is not an active bank account, so it cannot take a bank statement.");
         }
 
         if (string.IsNullOrWhiteSpace(content))

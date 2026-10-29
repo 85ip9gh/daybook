@@ -30,6 +30,19 @@ public class AccountApiTests(LedgerApiFixture api)
     }
 
     [Fact]
+    public async Task A_bank_account_is_marked_and_must_be_an_asset()
+    {
+        var bank = await api.OpenAccountAsync(AccountType.Asset, isBank: true);
+        var plain = await api.OpenAccountAsync(AccountType.Asset);
+
+        var revenue = await api.Client.PostAsJsonAsync("/accounts", new OpenAccountRequest("BANKREV", "Bank revenue", AccountType.Revenue, "CAD", IsBank: true), LedgerApiFixture.Json);
+
+        Assert.Equal((true, false), (bank.IsBank, plain.IsBank));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, revenue.StatusCode);
+        Assert.Equal("bank_account_not_asset", await LedgerApiFixture.ProblemCodeAsync(revenue));
+    }
+
+    [Fact]
     public async Task A_new_account_has_a_zero_balance_on_its_normal_side()
     {
         var payable = await api.OpenAccountAsync(AccountType.Liability);

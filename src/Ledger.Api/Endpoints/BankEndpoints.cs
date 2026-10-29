@@ -33,6 +33,8 @@ public sealed record BankLineResponse(
 
 public sealed record LedgerLineResponse(Guid JournalEntryId, int LineNumber, DateOnly EntryDate, decimal Amount);
 
+public sealed record MatchedLineResponse(Guid Id, DateOnly Date, string Reference, string Description, decimal Amount, DateOnly EntryDate, string MatchedBy);
+
 public sealed record ReconciliationResponse(
     Guid AccountId,
     DateOnly AsOf,
@@ -41,7 +43,8 @@ public sealed record ReconciliationResponse(
     IReadOnlyList<BankLineResponse> UnmatchedBankLines,
     decimal UnmatchedBankTotal,
     IReadOnlyList<LedgerLineResponse> UnreconciledLedgerLines,
-    decimal UnreconciledLedgerTotal);
+    decimal UnreconciledLedgerTotal,
+    IReadOnlyList<MatchedLineResponse> MatchedBankLines);
 
 public sealed record MatchRequest(Guid JournalEntryId, int LineNumber);
 
@@ -184,6 +187,16 @@ internal static class BankEndpoints
             .ThenBy(line => line.Reference)
             .ToListAsync(cancellationToken);
         var unreconciled = await db.UnreconciledAsync(accountId, DateOnly.MinValue, date, cancellationToken);
+        var matched = await bankLines
+            .Where(line => line.MatchedEntryId != null)
+            .Join(
+                db.JournalLines,
+                line => new { EntryId = line.MatchedEntryId, LineNumber = line.MatchedLineNumber },
+                ledgerLine => new { EntryId = (Guid?)ledgerLine.JournalEntryId, LineNumber = (int?)ledgerLine.LineNumber },
+                (line, ledgerLine) => new { Line = line, ledgerLine.EntryDate })
+            .OrderByDescending(pair => pair.Line.Date)
+            .ThenBy(pair => pair.Line.Reference)
+            .ToListAsync(cancellationToken);
 
         return Results.Ok(new ReconciliationResponse(
             accountId,
@@ -195,7 +208,15 @@ internal static class BankEndpoints
             [.. unreconciled
                 .OrderBy(item => item.Date)
                 .Select(item => new LedgerLineResponse(item.JournalEntryId, item.LineNumber, item.Date, item.SignedAmount))],
-            unreconciled.Sum(item => item.SignedAmount)));
+            unreconciled.Sum(item => item.SignedAmount),
+            [.. matched.Select(pair => new MatchedLineResponse(
+                pair.Line.Id,
+                pair.Line.Date,
+                pair.Line.Reference,
+                pair.Line.Description,
+                pair.Line.Amount,
+                pair.EntryDate,
+                pair.Line.MatchedBy!))]));
     }
 
     private static async Task<IResult> MatchAsync(

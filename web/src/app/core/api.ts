@@ -14,6 +14,7 @@ export interface Account {
   type: AccountType;
   currency: string;
   isActive: boolean;
+  isBank: boolean;
 }
 
 export interface TrialBalanceRow {
@@ -201,6 +202,16 @@ export interface LedgerLine {
   amount: number;
 }
 
+export interface MatchedLine {
+  id: string;
+  date: string;
+  reference: string;
+  description: string;
+  amount: number;
+  entryDate: string;
+  matchedBy: string;
+}
+
 export interface Reconciliation {
   accountId: string;
   asOf: string;
@@ -210,6 +221,7 @@ export interface Reconciliation {
   unmatchedBankTotal: number;
   unreconciledLedgerLines: LedgerLine[];
   unreconciledLedgerTotal: number;
+  matchedBankLines: MatchedLine[];
 }
 
 export interface User {
@@ -258,7 +270,9 @@ export class Api {
     return this.http.get<Account[]>(this.url('/accounts'));
   }
 
-  openAccount(account: Pick<Account, 'code' | 'name' | 'type' | 'currency'>): Observable<Account> {
+  openAccount(
+    account: Pick<Account, 'code' | 'name' | 'type' | 'currency' | 'isBank'>,
+  ): Observable<Account> {
     return this.http.post<Account>(this.url('/accounts'), account);
   }
 
@@ -355,6 +369,10 @@ export class Api {
       journalEntryId,
       lineNumber,
     });
+  }
+
+  unmatchBankLine(bankLineId: string): Observable<void> {
+    return this.http.post<void>(this.url(`/bank-lines/${bankLineId}/unmatch`), null);
   }
 
   users(): Observable<User[]> {

@@ -20,7 +20,7 @@ internal static class AccountEndpoints
 
     private static async Task<IResult> OpenAsync(OpenAccountRequest request, LedgerDbContext db, CancellationToken cancellationToken)
     {
-        var account = Account.Open(request.Code, request.Name, request.Type, request.Currency);
+        var account = Account.Open(request.Code, request.Name, request.Type, request.Currency, request.IsBank);
         db.Accounts.Add(account);
 
         try

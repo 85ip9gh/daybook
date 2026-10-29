@@ -12,8 +12,17 @@ const accounts: Account[] = [
     type: 'Asset',
     currency: 'CAD',
     isActive: true,
+    isBank: true,
   },
-  { id: 'fees', code: '5300', name: 'Bank fees', type: 'Expense', currency: 'CAD', isActive: true },
+  {
+    id: 'fees',
+    code: '5300',
+    name: 'Bank fees',
+    type: 'Expense',
+    currency: 'CAD',
+    isActive: true,
+    isBank: false,
+  },
   {
     id: 'old',
     code: '1001',
@@ -21,6 +30,7 @@ const accounts: Account[] = [
     type: 'Asset',
     currency: 'CAD',
     isActive: false,
+    isBank: true,
   },
 ];
 

@@ -2,9 +2,9 @@ using Ledger.Domain;
 
 namespace Ledger.Api;
 
-public sealed record OpenAccountRequest(string Code, string Name, AccountType Type, string Currency);
+public sealed record OpenAccountRequest(string Code, string Name, AccountType Type, string Currency, bool IsBank = false);
 
-public sealed record AccountResponse(Guid Id, string Code, string Name, AccountType Type, string Currency, bool IsActive);
+public sealed record AccountResponse(Guid Id, string Code, string Name, AccountType Type, string Currency, bool IsActive, bool IsBank);
 
 public sealed record AccountBalanceResponse(Guid AccountId, DateOnly AsOf, decimal Debits, decimal Credits, decimal Balance, EntrySide NormalSide);
 
@@ -35,7 +35,7 @@ public sealed record PeriodsResponse(DateOnly? ClosedThrough, IReadOnlyList<Peri
 internal static class ContractMappings
 {
     public static AccountResponse ToResponse(this Account account) =>
-        new(account.Id, account.Code, account.Name, account.Type, account.Currency, account.IsActive);
+        new(account.Id, account.Code, account.Name, account.Type, account.Currency, account.IsActive, account.IsBank);
 
     public static EntryResponse ToResponse(this JournalEntry entry) =>
         new(

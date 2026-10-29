@@ -138,17 +138,19 @@ public class BankingTests
     }
 
     [Fact]
-    public void A_statement_can_only_be_imported_against_an_active_asset_account()
+    public void A_statement_can_only_be_imported_against_an_active_bank_account()
     {
-        var bank = Account.Open("1000", "Bank", AccountType.Asset, "CAD");
+        var bank = Account.Open("1000", "Bank", AccountType.Asset, "CAD", isBank: true);
         var revenue = Account.Open("4000", "Revenue", AccountType.Revenue, "CAD");
-        var closed = Account.Open("1001", "Old bank", AccountType.Asset, "CAD");
+        var receivable = Account.Open("1200", "Accounts receivable", AccountType.Asset, "CAD");
+        var closed = Account.Open("1001", "Old bank", AccountType.Asset, "CAD", isBank: true);
         closed.Deactivate();
 
         var statement = BankStatement.Import(bank, Header + "2026-10-01,R1,x,1.00", "clerk", Now);
 
         Assert.Equal((StatementStatus.Pending, "clerk", 64), (statement.Status, statement.ImportedBy, statement.ContentHash.Length));
         Assert.Equal("bank_account_invalid", Assert.Throws<LedgerRuleException>(() => BankStatement.Import(revenue, "x", "clerk", Now)).Code);
+        Assert.Equal("bank_account_invalid", Assert.Throws<LedgerRuleException>(() => BankStatement.Import(receivable, "x", "clerk", Now)).Code);
         Assert.Equal("bank_account_invalid", Assert.Throws<LedgerRuleException>(() => BankStatement.Import(closed, "x", "clerk", Now)).Code);
         Assert.Equal("statement_empty", Assert.Throws<LedgerRuleException>(() => BankStatement.Import(bank, "  ", "clerk", Now)).Code);
         Assert.Equal("statement_too_large", Assert.Throws<LedgerRuleException>(() => BankStatement.Import(bank, new string('x', BankStatement.MaxContentLength + 1), "clerk", Now)).Code);
@@ -157,7 +159,7 @@ public class BankingTests
     [Fact]
     public void The_same_content_always_hashes_the_same_and_different_content_does_not()
     {
-        var bank = Account.Open("1000", "Bank", AccountType.Asset, "CAD");
+        var bank = Account.Open("1000", "Bank", AccountType.Asset, "CAD", isBank: true);
 
         var first = BankStatement.Import(bank, Header + "2026-10-01,R1,x,1.00", "clerk", Now);
         var again = BankStatement.Import(bank, Header + "2026-10-01,R1,x,1.00", "someone-else", Now.AddDays(1));
@@ -170,7 +172,7 @@ public class BankingTests
     [Fact]
     public void A_bank_line_matches_only_an_equal_amount_and_only_once()
     {
-        var bank = Account.Open("1000", "Bank", AccountType.Asset, "CAD");
+        var bank = Account.Open("1000", "Bank", AccountType.Asset, "CAD", isBank: true);
         var statement = BankStatement.Import(bank, Header + "2026-10-01,R1,x,25.00", "clerk", Now);
         var line = BankLine.From(statement, new StatementLineDraft(Day, "R1", "x", 25m));
         var entryId = Guid.NewGuid();

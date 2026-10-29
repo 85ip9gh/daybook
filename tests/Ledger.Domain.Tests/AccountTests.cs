@@ -11,6 +11,17 @@ public class AccountTests
         Assert.Equal("Cash", account.Name);
         Assert.Equal("CAD", account.Currency);
         Assert.True(account.IsActive);
+        Assert.False(account.IsBank);
+    }
+
+    [Fact]
+    public void Only_an_asset_account_can_be_a_bank_account()
+    {
+        var bank = Account.Open("1000", "Operating account", AccountType.Asset, "CAD", isBank: true);
+        var exception = Assert.Throws<LedgerRuleException>(() => Account.Open("4000", "Sales", AccountType.Revenue, "CAD", isBank: true));
+
+        Assert.True(bank.IsBank);
+        Assert.Equal("bank_account_not_asset", exception.Code);
     }
 
     [Theory]

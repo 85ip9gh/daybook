@@ -61,8 +61,8 @@ const approver = tokens['demo-approver'];
 const controller = tokens['demo-controller'];
 
 const chart = [
-  ['1000', 'Operating account', 'Asset'],
-  ['1010', 'Savings account', 'Asset'],
+  ['1000', 'Operating account', 'Asset', true],
+  ['1010', 'Savings account', 'Asset', true],
   ['1200', 'Accounts receivable', 'Asset'],
   ['1500', 'Equipment', 'Asset'],
   ['2000', 'Accounts payable', 'Liability'],
@@ -78,8 +78,8 @@ const chart = [
 ];
 
 const account = {};
-for (const [code, name, type] of chart) {
-  account[code] = (await call(controller, 'POST', '/accounts', { code, name, type, currency: 'CAD' })).id;
+for (const [code, name, type, isBank = false] of chart) {
+  account[code] = (await call(controller, 'POST', '/accounts', { code, name, type, currency: 'CAD', isBank })).id;
 }
 
 async function post(entryDate, description, debit, credit, amount) {

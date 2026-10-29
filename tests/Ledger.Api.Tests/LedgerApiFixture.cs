@@ -135,10 +135,10 @@ public sealed class LedgerApiFixture : IAsyncLifetime
         return await query(scope.ServiceProvider.GetRequiredService<LedgerDbContext>());
     }
 
-    public async Task<AccountResponse> OpenAccountAsync(AccountType type, string currency = "CAD")
+    public async Task<AccountResponse> OpenAccountAsync(AccountType type, string currency = "CAD", bool isBank = false)
     {
         var code = $"T{Interlocked.Increment(ref _accountSequence):D6}";
-        var response = await Client.PostAsJsonAsync("/accounts", new OpenAccountRequest(code, $"Account {code}", type, currency), Json);
+        var response = await Client.PostAsJsonAsync("/accounts", new OpenAccountRequest(code, $"Account {code}", type, currency, isBank), Json);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AccountResponse>(Json))!;
     }

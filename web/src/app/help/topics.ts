@@ -71,6 +71,11 @@ export const topics: Record<string, Topic> = {
       { term: 'Type', meaning: 'Asset, Liability, Equity, Revenue or Expense.' },
       { term: 'Currency', meaning: 'The money it is kept in, such as CAD.' },
       { term: 'Inactive', meaning: 'Can no longer take new entries.' },
+      {
+        term: 'Bank account',
+        meaning:
+          'An account the bank sends statements for. Only these appear on Bank reconciliation.',
+      },
       { term: 'Open an account', meaning: 'Add an account. Controller only.' },
     ],
   },
@@ -172,6 +177,19 @@ export const topics: Record<string, Topic> = {
     purpose: 'Check the books against the bank statement, line by line.',
     terms: [
       {
+        term: 'Balance in the books',
+        meaning: 'The account’s total in Daybook on the As of date.',
+      },
+      {
+        term: 'Total of uploaded bank lines',
+        meaning:
+          'Every uploaded bank line added up. Not the bank’s balance unless every statement was uploaded.',
+      },
+      {
+        term: 'At the bank only, In the books only',
+        meaning: 'Totals of the unpaired lines. Both 0 means the books and the bank agree.',
+      },
+      {
         term: 'Import a statement',
         meaning: 'Upload the bank’s transaction file (CSV). Clerk only.',
       },
@@ -192,6 +210,10 @@ export const topics: Record<string, Topic> = {
         meaning: 'Not through the bank yet, such as a payment on its way.',
       },
       { term: 'Match by hand', meaning: 'Pair two equal amounts yourself. Approver only.' },
+      {
+        term: 'Undo match',
+        meaning: 'Split a pair. Both lines go back to unpaired. Approver only.',
+      },
       { term: 'Reference', meaning: 'The bank’s ID for the line.' },
     ],
   },
