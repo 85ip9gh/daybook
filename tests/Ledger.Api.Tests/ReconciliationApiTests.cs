@@ -23,7 +23,7 @@ public class ReconciliationApiTests(LedgerApiFixture api)
     private static string Line(DateOnly date, string reference, decimal amount) => $"{date:yyyy-MM-dd},{reference},Statement line,{amount:0.00}\n";
 
     private async Task<(AccountResponse Bank, AccountResponse Other)> AccountsAsync() =>
-        (await api.OpenAccountAsync(AccountType.Asset), await api.OpenAccountAsync(AccountType.Revenue));
+        (await api.OpenAccountAsync(AccountType.Asset, isBank: true), await api.OpenAccountAsync(AccountType.Revenue));
 
     private async Task<EntryResponse> BookAsync(AccountResponse bank, AccountResponse other, decimal amount, DateOnly date)
     {
@@ -146,11 +146,12 @@ public class ReconciliationApiTests(LedgerApiFixture api)
         var unmatched = await api.Approver.PostAsync($"/bank-lines/{line.Id}/unmatch", null);
         var restored = await ReportAsync(bank.Id);
 
-        Assert.Equal((1, 1), (before.UnmatchedBankLines.Count, before.UnreconciledLedgerLines.Count));
+        Assert.Equal((1, 1, 0), (before.UnmatchedBankLines.Count, before.UnreconciledLedgerLines.Count, before.MatchedBankLines.Count));
         Assert.Equal("approver", (await api.ReadAsync<BankLineResponse>(matched)).MatchedBy);
         Assert.Equal((0, 0), (after.UnmatchedBankLines.Count, after.UnreconciledLedgerLines.Count));
+        Assert.Equal((line.Id, Day.AddDays(10), Day, 75m, "approver"), after.MatchedBankLines.Select(pair => (pair.Id, pair.Date, pair.EntryDate, pair.Amount, pair.MatchedBy)).Single());
         Assert.Equal(HttpStatusCode.OK, unmatched.StatusCode);
-        Assert.Equal((1, 1), (restored.UnmatchedBankLines.Count, restored.UnreconciledLedgerLines.Count));
+        Assert.Equal((1, 1, 0), (restored.UnmatchedBankLines.Count, restored.UnreconciledLedgerLines.Count, restored.MatchedBankLines.Count));
     }
 
     [Fact]
@@ -285,14 +286,17 @@ public class ReconciliationApiTests(LedgerApiFixture api)
     public async Task A_statement_is_refused_for_an_account_that_is_not_a_bank_account_and_from_a_viewer()
     {
         var (bank, revenue) = await AccountsAsync();
+        var receivable = await api.OpenAccountAsync(AccountType.Asset);
         var content = Header + Line(Day, Reference(), 10m);
 
         var notABank = await UploadRawAsync(api.Clerk, revenue.Id, content);
+        var plainAsset = await UploadRawAsync(api.Clerk, receivable.Id, content);
         var empty = await UploadRawAsync(api.Clerk, bank.Id, " ");
         var missing = await UploadRawAsync(api.Clerk, Guid.NewGuid(), content);
         var viewer = await UploadRawAsync(api.Viewer, bank.Id, content);
 
         Assert.Equal("bank_account_invalid", await LedgerApiFixture.ProblemCodeAsync(notABank));
+        Assert.Equal("bank_account_invalid", await LedgerApiFixture.ProblemCodeAsync(plainAsset));
         Assert.Equal("statement_empty", await LedgerApiFixture.ProblemCodeAsync(empty));
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, viewer.StatusCode);

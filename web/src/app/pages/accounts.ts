@@ -42,6 +42,12 @@ import { load, loaded } from '../core/loaded';
                 <span>Currency</span>
                 <input name="currency" maxlength="3" [(ngModel)]="currency" />
               </label>
+              @if (type === 'Asset') {
+                <label class="check">
+                  <input type="checkbox" name="isBank" [(ngModel)]="isBank" />
+                  Bank account
+                </label>
+              }
               <button type="submit" class="button primary" [disabled]="busy()">Open account</button>
             </div>
             @if (error()) {
@@ -74,7 +80,7 @@ import { load, loaded } from '../core/loaded';
                       <td>
                         <a [routerLink]="['/accounts', account.id]">{{ account.name }}</a>
                       </td>
-                      <td class="muted">{{ account.type }}</td>
+                      <td class="muted">{{ account.type }}{{ account.isBank ? ', bank' : '' }}</td>
                       <td class="code wide-only">{{ account.currency }}</td>
                       <td class="muted">{{ account.isActive ? 'Active' : 'Inactive' }}</td>
                     </tr>
@@ -126,6 +132,7 @@ export class AccountsPage {
   protected name = '';
   protected type: AccountType = 'Asset';
   protected currency = 'CAD';
+  protected isBank = false;
 
   constructor() {
     this.refresh();
@@ -136,12 +143,19 @@ export class AccountsPage {
     this.error.set('');
 
     this.api
-      .openAccount({ code: this.code, name: this.name, type: this.type, currency: this.currency })
+      .openAccount({
+        code: this.code,
+        name: this.name,
+        type: this.type,
+        currency: this.currency,
+        isBank: this.type === 'Asset' && this.isBank,
+      })
       .subscribe({
         next: () => {
           this.busy.set(false);
           this.code = '';
           this.name = '';
+          this.isBank = false;
           this.refresh();
         },
         error: (error: unknown) => {

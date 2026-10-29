@@ -21,7 +21,9 @@ public sealed class Account
 
     public bool IsActive { get; private set; }
 
-    public static Account Open(string? code, string? name, AccountType type, string? currency)
+    public bool IsBank { get; private set; }
+
+    public static Account Open(string? code, string? name, AccountType type, string? currency, bool isBank = false)
     {
         var trimmedCode = code?.Trim() ?? string.Empty;
         var trimmedName = name?.Trim() ?? string.Empty;
@@ -41,6 +43,11 @@ public sealed class Account
             throw new LedgerRuleException("account_type_invalid", "Account type is not recognised.");
         }
 
+        if (isBank && type != AccountType.Asset)
+        {
+            throw new LedgerRuleException("bank_account_not_asset", "Only an asset account can be a bank account.");
+        }
+
         return new Account
         {
             Id = Guid.NewGuid(),
@@ -49,6 +56,7 @@ public sealed class Account
             Type = type,
             Currency = CurrencyCode.Parse(currency),
             IsActive = true,
+            IsBank = isBank,
         };
     }
 

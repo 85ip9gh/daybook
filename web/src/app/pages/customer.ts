@@ -169,7 +169,7 @@ export class CustomerPage {
     () => this.customers().value?.find((customer) => customer.id === this.id()) ?? null,
   );
   protected readonly deposits = computed(() =>
-    (this.accounts().value ?? []).filter((account) => account.type === 'Asset' && account.isActive),
+    (this.accounts().value ?? []).filter((account) => account.isBank && account.isActive),
   );
   protected readonly summary = computed(() =>
     summarisePayment(
